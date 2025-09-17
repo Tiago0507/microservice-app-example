@@ -1,17 +1,30 @@
-# Microservice App - PRFT Devops Training
+#1. Estrategia de Branching
 
-This is the application you are going to use through the whole traninig. This, hopefully, will teach you the fundamentals you need in a real project. You will find a basic TODO application designed with a [microservice architecture](https://microservices.io). Although is a TODO application, it is interesting because the microservices that compose it are written in different programming language or frameworks (Go, Python, Vue, Java, and NodeJS). With this design you will experiment with multiple build tools and environments. 
+A continuación se responde se estará definiendo una estrategia clara para cada rol del equipo.
 
-## Components
-In each folder you can find a more in-depth explanation of each component:
+##1.1 Desarrolladores – Gitflow (2.5%)
 
-1. [Users API](/users-api) is a Spring Boot application. Provides user profiles. At the moment, does not provide full CRUD, just getting a single user and all users.
-2. [Auth API](/auth-api) is a Go application, and provides authorization functionality. Generates [JWT](https://jwt.io/) tokens to be used with other APIs.
-3. [TODOs API](/todos-api) is a NodeJS application, provides CRUD functionality over user's TODO records. Also, it logs "create" and "delete" operations to [Redis](https://redis.io/) queue.
-4. [Log Message Processor](/log-message-processor) is a queue processor written in Python. Its purpose is to read messages from a Redis queue and print them to standard output.
-5. [Frontend](/frontend) Vue application, provides UI.
+El equipo de desarrollo sigue un modelo estructurado para planificar releases y trabajar en paralelo sin afectar producción.
 
-## Architecture
+- main: código en producción (protegida, solo merges vía PR).
+- develop: integración estable para la próxima release.
+- feature/<nombre-corto>: nuevas funcionalidades; se crean desde develop y vuelven a develop vía PR y revisión.
+- release/<versión>: estabilización previa al release (correcciones menores, docs); se mergea a main y a develop.
+- hotfix/<versión>: correcciones críticas desde main; tras validar, se mergea a main y a develop.
 
-Take a look at the components diagram that describes them and their interactions.
-![microservice-app-example](/arch-img/Microservices.png)
+Convenciones: usar PRs con revisión obligatoria, CI verde antes de merge, nombres descriptivos y pequeños lotes de cambio.
+
+Rationale: mayor control del versionamiento, menor riesgo en producción y mejor coordinación entre equipos.
+
+##1.2 Operaciones – GitHub Flow (2.5%)
+
+El equipo de operaciones sigue un modelo ligero para cambios operativos y de despliegue continuo.
+
+- main siempre desplegable; cambios pequeños y frecuentes.
+- ramas cortas: fix/<tema>, chore/<tarea>, hotfix/<incidencia>; creadas desde main.
+- PR a main con revisión; al merge se dispara CD hacia el entorno objetivo.
+- hotfix: se prioriza, prueba rápida, merge a main y despliegue inmediato.
+
+Guardas: checks de CI obligatorios, políticas de protección en main y approvals requeridos.
+
+Rationale: simplicidad, agilidad y tiempos de recuperación cortos, alineado a objetivos de disponibilidad.
