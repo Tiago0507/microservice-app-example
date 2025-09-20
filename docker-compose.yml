@@ -1,0 +1,135 @@
+# Docker Compose for Microservices Application
+#
+# This file defines and orchestrates the multi-container application environment.
+# It specifies how each microservice is built, configured, and networked together,
+# allowing the entire application stack to be launched with a single command.
+
+services:
+  # --- Frontend Service ---
+  # Serves the Vue.js user interface using an Nginx web server. It acts as the
+  # primary entry point for user traffic and as a reverse proxy for the backend APIs.
+  frontend:
+    build:
+      # Specifies the location of the Dockerfile for this service.
+      context: ./microservices/frontend
+    ports:
+      # Maps port 80 inside the container to port 8080 on the host machine.
+      # This makes the frontend accessible at http://localhost:8080.
+      - "8080:80"
+    depends_on:
+      # Defines the startup order. This service will not start until 'auth-api'
+      # and 'todos-api' have started, ensuring the backend is available.
+      - auth-api
+      - todos-api
+    networks:
+      # Connects this service to the custom bridge network.
+      - microservices-net
+
+  # --- Authentication API Service ---
+  # Handles user login and JWT token generation. Written in Go.
+  auth-api:
+    build:
+      context: ./microservices/auth-api
+    ports:
+      # Exposes the service on port 8000 for direct access during development if needed.
+      - "8000:8000"
+    environment:
+      # Injects environment variables into the container at runtime.
+      - JWT_SECRET=PRFT
+      # Sets the address for the users-api. Docker's internal DNS resolves 'users-api'
+      # to the correct container IP within the 'microservices-net' network.
+      - USERS_API_ADDRESS=http://users-api:8083
+      - AUTH_API_PORT=8000
+      - ZIPKIN_URL=http://zipkin:9411/api/v2/spans
+    depends_on:
+      users-api:
+        # A stronger dependency condition. It waits for the 'users-api' not just to start,
+        # but to become healthy, as defined by its healthcheck.
+        condition: service_healthy
+    networks:
+      - microservices-net
+
+  # --- Users API Service ---
+  # Manages user data. Written in Java with Spring Boot.
+  users-api:
+    build:
+      context: ./microservices/users-api
+    ports:
+      - "8083:8083"
+    environment:
+      - JWT_SECRET=PRFT
+      - SERVER_PORT=8083
+      - spring.zipkin.baseUrl=http://zipkin:9411/
+    healthcheck:
+      # Defines a command to check if the service is healthy.
+      # 'nc -z' (netcat) checks if the specified port is open and listening.
+      # If the command fails, the container is marked as unhealthy.
+      test: ["CMD-SHELL", "nc -z localhost 8083 || exit 1"]
+      interval: 10s      # How often to run the check.
+      timeout: 5s        # How long to wait for a response.
+      retries: 5         # How many times to retry on failure before marking as unhealthy.
+      start_period: 30s  # Grace period for the service to start up before checks begin.
+    networks:
+      - microservices-net
+
+  # --- Todos API Service ---
+  # Provides CRUD operations for todo items. Written in Node.js.
+  todos-api:
+    build:
+      context: ./microservices/todos-api
+    ports:
+      - "8082:8082"
+    environment:
+      - JWT_SECRET=PRFT
+      - TODO_API_PORT=8082
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_CHANNEL=log_channel
+      - ZIPKIN_URL=http://zipkin:9411/api/v2/spans
+    depends_on:
+      - redis
+    networks:
+      - microservices-net
+
+  # --- Log Message Processor Service ---
+  # Listens to a Redis queue for messages and logs them. Written in Python.
+  log-message-processor:
+    build:
+      context: ./microservices/log-message-processor
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_CHANNEL=log_channel
+      - ZIPKIN_URL=http://zipkin:9411/api/v2/spans
+    depends_on:
+      - redis
+    networks:
+      - microservices-net
+
+  # --- Supporting Services ---
+
+  # Redis in-memory data store.
+  redis:
+    # Pulls a pre-built image from Docker Hub instead of building from a Dockerfile.
+    image: "redis:7.0-alpine"
+    ports:
+      - "6379:6379"
+    networks:
+      - microservices-net
+
+  # Zipkin distributed tracing system.
+  zipkin:
+    image: openzipkin/zipkin
+    ports:
+      - "9411:9411"
+    networks:
+      - microservices-net
+
+# --- Global Definitions ---
+
+# Defines the custom network that all services will join.
+networks:
+  microservices-net:
+    # The 'bridge' driver creates a private, isolated network for the containers.
+    # Docker provides automatic service discovery (DNS) on this network.
+    driver: bridge
