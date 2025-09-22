@@ -1,30 +1,30 @@
-#1. Estrategia de Branching
+#1. Branching Strategy
 
-A continuación se responde se estará definiendo una estrategia clara para cada rol del equipo.
+Below is a clear branching strategy for both team roles.
 
-##1.1 Desarrolladores – Gitflow (2.5%)
+##1.1 Developers – GitHub Flow (2.5%)
 
-El equipo de desarrollo sigue un modelo estructurado para planificar releases y trabajar en paralelo sin afectar producción.
+The development team uses GitHub Flow for small and frequent changes with `main` always deployable.
 
-- main: código en producción (protegida, solo merges vía PR).
-- develop: integración estable para la próxima release.
-- feature/<nombre-corto>: nuevas funcionalidades; se crean desde develop y vuelven a develop vía PR y revisión.
-- release/<versión>: estabilización previa al release (correcciones menores, docs); se mergea a main y a develop.
-- hotfix/<versión>: correcciones críticas desde main; tras validar, se mergea a main y a develop.
+- main is always deployable; small and frequent changes.
+- short-lived branches off main: feature/<topic>, fix/<bug>, chore/<task>, hotfix/<incident>.
+- open a PR to main with mandatory review; CI must be green before merge.
+- merging to main triggers CD to the target environment.
+- hotfix: prioritized, quick validation, merge to main and immediate deploy.
 
-Convenciones: usar PRs con revisión obligatoria, CI verde antes de merge, nombres descriptivos y pequeños lotes de cambio.
+Guards: required CI checks, branch protection on main, and required approvals.
 
-Rationale: mayor control del versionamiento, menor riesgo en producción y mejor coordinación entre equipos.
+Rationale: simplicity, agility, and short recovery times.
 
-##1.2 Operaciones – GitHub Flow (2.5%)
+##1.2 Operations – GitHub Flow (2.5%)
 
-El equipo de operaciones sigue un modelo ligero para cambios operativos y de despliegue continuo.
+The operations team also uses GitHub Flow for operational changes and continuous delivery.
 
-- main siempre desplegable; cambios pequeños y frecuentes.
-- ramas cortas: fix/<tema>, chore/<tarea>, hotfix/<incidencia>; creadas desde main.
-- PR a main con revisión; al merge se dispara CD hacia el entorno objetivo.
-- hotfix: se prioriza, prueba rápida, merge a main y despliegue inmediato.
+- main is always deployable; small and frequent changes.
+- short-lived branches off main: fix/<topic>, chore/<task>, hotfix/<incident>.
+- PR to main with review; merging triggers CD to the target environment.
+- hotfix: prioritized, quick validation, merge to main and immediate deploy.
 
-Guardas: checks de CI obligatorios, políticas de protección en main y approvals requeridos.
+Guards: required CI checks, branch protection on main, and required approvals.
 
-Rationale: simplicidad, agilidad y tiempos de recuperación cortos, alineado a objetivos de disponibilidad.
+Rationale: simplicity, agility, and short recovery times aligned with availability goals.
