@@ -22,6 +22,8 @@ services:
     image: santiagovg/users-api
     ports:
       - "8083:8083"
+    expose:
+      - "8083"
     environment:
       - JWT_SECRET=PRFT
       - SERVER_PORT=8083
