@@ -1,0 +1,72 @@
+services:
+  frontend:
+    image: santiagovg/frontend
+    ports:
+      - "8080:80"
+    networks:
+      - microservices-net
+
+  auth-api:
+    image: santiagovg/auth-api
+    ports:
+      - "8000:8000"
+    environment:
+      - JWT_SECRET=PRFT
+      - USERS_API_ADDRESS=http://users-api:8083
+      - AUTH_API_PORT=8000
+      - ZIPKIN_URL=http://zipkin:9411/api/v2/spans
+    networks:
+      - microservices-net
+
+  users-api:
+    image: santiagovg/users-api
+    ports:
+      - "8083:8083"
+    environment:
+      - JWT_SECRET=PRFT
+      - SERVER_PORT=8083
+      - spring.zipkin.baseUrl=http://zipkin:9411/
+    networks:
+      - microservices-net
+
+  todos-api:
+    image: santiagovg/todos-api
+    ports:
+      - "8082:8082"
+    environment:
+      - JWT_SECRET=PRFT
+      - TODO_API_PORT=8082
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_CHANNEL=log_channel
+      - ZIPKIN_URL=http://zipkin:9411/api/v2/spans
+    networks:
+      - microservices-net
+
+  log-message-processor:
+    image: santiagovg/log-message-processor
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_CHANNEL=log_channel
+      - ZIPKIN_URL=http://zipkin:9411/api/v2/spans
+    networks:
+      - microservices-net
+
+  redis:
+    image: "redis:7.0-alpine"
+    ports:
+      - "6379:6379"
+    networks:
+      - microservices-net
+
+  zipkin:
+    image: openzipkin/zipkin
+    ports:
+      - "9411:9411"
+    networks:
+      - microservices-net
+
+networks:
+  microservices-net:
+    driver: bridge
