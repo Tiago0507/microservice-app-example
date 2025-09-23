@@ -32,6 +32,10 @@ func main() {
 		jwtSecret = envJwtSecret
 	}
 
+	// Crear Circuit Breaker para comunicación con users-api
+	circuitBreakerConfig := DefaultCircuitBreakerConfig()
+	circuitBreaker := NewHTTPCircuitBreaker("users-api-circuit-breaker", circuitBreakerConfig)
+
 	userService := UserService{
 		Client:         http.DefaultClient,
 		UserAPIAddress: userAPIAddress,
@@ -40,6 +44,7 @@ func main() {
 			"johnd_foo":   nil,
 			"janed_ddd":   nil,
 		},
+		CircuitBreaker: circuitBreaker,
 	}
 
 	e := echo.New()
@@ -68,6 +73,9 @@ func main() {
 	})
 
 	e.POST("/login", getLoginHandler(userService))
+
+	// Endpoint para monitorear el Circuit Breaker
+	e.GET("/health/circuit-breaker", getCircuitBreakerStatusHandler(circuitBreaker))
 
 	// Start server
 	e.Logger.Fatal(e.Start(hostport))
@@ -120,4 +128,14 @@ func getLoginHandler(userService UserService) echo.HandlerFunc {
 	}
 
 	return echo.HandlerFunc(f)
+}
+
+func getCircuitBreakerStatusHandler(circuitBreaker *HTTPCircuitBreaker) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		status := circuitBreaker.GetStatus()
+		status["timestamp"] = time.Now().Format(time.RFC3339)
+		status["service"] = "auth-api"
+		
+		return c.JSON(http.StatusOK, status)
+	}
 }

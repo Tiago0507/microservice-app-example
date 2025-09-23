@@ -27,6 +27,7 @@ services:
 
   # --- Authentication API Service ---
   # Handles user login and JWT token generation. Written in Go.
+  # Implements Circuit Breaker pattern for resilient communication with users-api.
   auth-api:
     build:
       context: ./microservices/auth-api
@@ -51,6 +52,7 @@ services:
 
   # --- Users API Service ---
   # Manages user data. Written in Java with Spring Boot.
+  # Implements Cache-Aside pattern with Redis for improved performance.
   users-api:
     build:
       context: ./microservices/users-api
@@ -60,6 +62,10 @@ services:
       - JWT_SECRET=PRFT
       - SERVER_PORT=8083
       - spring.zipkin.baseUrl=http://zipkin:9411/
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - redis
     healthcheck:
       # Defines a command to check if the service is healthy.
       # 'nc -z' (netcat) checks if the specified port is open and listening.
@@ -74,6 +80,7 @@ services:
 
   # --- Todos API Service ---
   # Provides CRUD operations for todo items. Written in Node.js.
+  # Implements Circuit Breaker pattern for resilient communication with Redis.
   todos-api:
     build:
       context: ./microservices/todos-api

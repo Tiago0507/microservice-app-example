@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 
 	jwt "github.com/dgrijalva/jwt-go"
@@ -31,6 +32,7 @@ type UserService struct {
 	Client            HTTPDoer
 	UserAPIAddress    string
 	AllowedUserHashes map[string]interface{}
+	CircuitBreaker    *HTTPCircuitBreaker
 }
 
 func (h *UserService) Login(ctx context.Context, username, password string) (User, error) {
@@ -55,15 +57,22 @@ func (h *UserService) getUser(ctx context.Context, username string) (User, error
 	if err != nil {
 		return user, err
 	}
+	
 	url := fmt.Sprintf("%s/users/%s", h.UserAPIAddress, username)
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Add("Authorization", "Bearer "+token)
 
-	req = req.WithContext(ctx)
-
-	resp, err := h.Client.Do(req)
+	// Usar Circuit Breaker para la comunicación con users-api
+	resp, err := h.CircuitBreaker.Execute(ctx, req)
 	if err != nil {
-		return user, err
+		log.Printf("🚫 Circuit Breaker fallback: Users API unavailable for user '%s': %v", username, err)
+		// Fallback: retornar un usuario por defecto cuando el servicio está caído
+		return User{
+			Username:  username,
+			FirstName: "Default",
+			LastName:  "User",
+			Role:      "user",
+		}, nil
 	}
 
 	defer resp.Body.Close()

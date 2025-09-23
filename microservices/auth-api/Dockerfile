@@ -6,7 +6,7 @@
 # --- Stage 1: Build Environment ---
 # Defines the first stage of the build, named 'builder'. It uses a lightweight
 # Alpine-based Go image that contains all the necessary tools to compile the application.
-FROM golang:1.22-alpine as builder
+FROM golang:1.22-alpine AS builder
 
 # Installs git within the build container. Go modules require git to fetch
 # dependencies from version control repositories. '--no-cache' reduces image size.
@@ -26,6 +26,9 @@ RUN go mod download
 
 # Copies the rest of the application's source code into the container.
 COPY . .
+
+# Ensures that go.mod and go.sum are in sync and include all necessary modules.
+RUN go mod tidy
 
 # Compiles the Go application into a single, statically-linked binary.
 # - CGO_ENABLED=0 disables Cgo, creating a pure Go binary without C dependencies.
