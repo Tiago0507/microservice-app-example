@@ -4,9 +4,9 @@
 # It is optimized for production use by installing only necessary dependencies
 # and leveraging Docker's layer caching for faster builds.
 
-# Specifies the base image for the build. 'node:8.17.0-slim' is a lightweight
+# Specifies the base image for the build. 'node:18-alpine' is a lightweight
 # version of the Node.js image, which helps to keep the final image size small.
-FROM node:8.17.0-slim
+FROM node:18-alpine
 
 # Sets the working directory inside the container to '/app'. All subsequent
 # commands will be executed from this directory.
@@ -20,7 +20,8 @@ COPY package*.json ./
 # Installs the project dependencies. The '--only=production' flag ensures that
 # development dependencies (like nodemon) are not installed, which is a best
 # practice for creating lean and secure production images.
-RUN npm install --only=production
+# RUN npm install --only=production
+RUN npm install
 
 # Copies the rest of the application's source code into the container's
 # working directory.
