@@ -1,0 +1,111 @@
+name: Log Message Processor - Dev Build & Deploy
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'microservices/log-message-processor/**'
+      - '.github/workflows/cicd-log-processor.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'microservices/log-message-processor/**'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      REMOTE_BASE_DIR: ~/microservice-app-example
+      REMOTE_SERVICE_DIR: ~/microservice-app-example/log-message-processor
+      SSH_HOST: 135.119.192.44
+      SSH_USERNAME: adminuser
+      SSH_PASSWORD: YourComplexPassword123!
+      SSH_PORT: 22
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check SSH reachability (port 22)
+        run: |
+          for i in {1..12}; do
+            if timeout 5 bash -c "echo > /dev/tcp/${{ env.SSH_HOST }}/22" 2>/dev/null; then
+              echo "SSH port reachable"; exit 0; fi; echo "Waiting for SSH... ($i)"; sleep 5; done; echo "SSH not reachable" >&2; exit 1
+
+      - name: Ensure remote directory exists
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USERNAME }}
+          password: ${{ env.SSH_PASSWORD }}
+          port: ${{ env.SSH_PORT }}
+          timeout: 120s
+          command_timeout: 20m
+          script: |
+            mkdir -p ${{ env.REMOTE_BASE_DIR }}
+            mkdir -p ${{ env.REMOTE_SERVICE_DIR }}
+
+      - name: Copy compose files to remote base dir
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USERNAME }}
+          password: ${{ env.SSH_PASSWORD }}
+          port: ${{ env.SSH_PORT }}
+          timeout: 120s
+          source: "docker-compose*.yml"
+          target: ${{ env.REMOTE_BASE_DIR }}
+
+      - name: Copy microservices folder to remote base dir
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USERNAME }}
+          password: ${{ env.SSH_PASSWORD }}
+          port: ${{ env.SSH_PORT }}
+          timeout: 180s
+          source: "microservices/**"
+          target: ${{ env.REMOTE_BASE_DIR }}
+
+      - name: Copy log-message-processor to remote host
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USERNAME }}
+          password: ${{ env.SSH_PASSWORD }}
+          port: ${{ env.SSH_PORT }}
+          timeout: 120s
+          source: "microservices/log-message-processor/**"
+          target: ${{ env.REMOTE_SERVICE_DIR }}
+          strip_components: 2
+
+      - name: Build and restart log-message-processor with Docker Compose
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USERNAME }}
+          password: ${{ env.SSH_PASSWORD }}
+          port: ${{ env.SSH_PORT }}
+          timeout: 180s
+          command_timeout: 30m
+          script: |
+            set -euo pipefail
+            echo "Reconstruyendo y levantando log-message-processor vía Docker Compose"
+            cd ${{ env.REMOTE_BASE_DIR }}
+            DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker-compose -f docker-compose.yml build log-message-processor
+            docker-compose -f docker-compose.yml rm -fsv log-message-processor redis || true
+            docker-compose -f docker-compose.yml up -d --force-recreate log-message-processor
+            CID=$(docker-compose ps -q log-message-processor || true)
+            if [ -z "$CID" ]; then
+              echo "No se encontró el contenedor log-message-processor" >&2
+              exit 1
+            fi
+            RUNNING=$(docker inspect -f '{{.State.Running}}' "$CID")
+            if [ "$RUNNING" != "true" ]; then
+              echo "El contenedor log-message-processor no está en ejecución" >&2
+              docker logs "$CID" || true
+              exit 1
+            fi
+            echo "log-message-processor desplegado correctamente"
