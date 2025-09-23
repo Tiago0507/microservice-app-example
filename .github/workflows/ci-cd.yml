@@ -1,0 +1,167 @@
+name: CI/CD Pipeline
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened, ready_for_review ]
+    paths-ignore:
+      - 'arch-img/**'
+      - '**/*.md'
+
+  push:
+    branches: [ main, feat/dev/pipelines ]
+    paths-ignore:
+      - 'arch-img/**'
+      - '**/*.md'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+  DOCKER_BUILDKIT: 1
+
+jobs:
+  pr_checks:
+    if: github.event_name == 'pull_request'
+    name: PR Checks (Lint, Unit, Security)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [ frontend, todos-api, users-api, auth-api, log-message-processor ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        if: matrix.service == 'frontend' || matrix.service == 'todos-api'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Set up Java
+        if: matrix.service == 'users-api'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Go
+        if: matrix.service == 'auth-api'
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Set up Python
+        if: matrix.service == 'log-message-processor'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Lint & Unit Tests (frontend)
+        if: matrix.service == 'frontend'
+        working-directory: frontend
+        run: |
+          npm ci
+          if npm run -s | grep -q '^lint\b'; then npm run lint; else echo "No lint script"; fi
+          if npm run -s | grep -q '^test\b'; then npm test --ignore-scripts; else echo "No test script"; fi
+          npm audit --production --audit-level=high || true
+
+      - name: Lint & Unit Tests (todos-api)
+        if: matrix.service == 'todos-api'
+        working-directory: todos-api
+        run: |
+          npm ci
+          if npm run -s | grep -q '^lint\b'; then npm run lint; else echo "No lint script"; fi
+          if npm run -s | grep -q '^test\b'; then npm test --ignore-scripts; else echo "No test script"; fi
+          npm audit --production --audit-level=high || true
+
+      - name: Lint & Unit Tests (users-api)
+        if: matrix.service == 'users-api'
+        working-directory: users-api
+        run: |
+          ./mvnw -q -DskipTests=false -Dspotbugs.skip=true -Dcheckstyle.skip=true test
+
+      - name: Lint & Unit Tests (auth-api)
+        if: matrix.service == 'auth-api'
+        working-directory: auth-api
+        run: |
+          go vet ./...
+          if go list ./... | grep -q .; then go test ./...; else echo "No go packages"; fi
+
+      - name: Lint & Unit Tests (log-message-processor)
+        if: matrix.service == 'log-message-processor'
+        working-directory: log-message-processor
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install flake8 pytest || true
+          if command -v flake8 >/dev/null; then flake8 . || true; fi
+          if ls -1 tests 2>/dev/null | grep -q .; then pytest -q; else echo "No tests"; fi
+
+  build_and_deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    name: Build, Test, Deploy
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push Images
+        uses: docker/bake-action@v5
+        with:
+          push: true
+          files: |
+            ./docker-bake.hcl
+          provenance: false
+        continue-on-error: true
+
+      - name: Fallback build (per service)
+        run: |
+          set -e
+          build_push() {
+            dir="$1"; name="$2"
+            if [ -f "$dir/Dockerfile" ]; then
+              image="${REGISTRY}/${IMAGE_PREFIX}/${name}:${GITHUB_SHA}"
+              echo "Building $image from $dir";
+              docker build -t "$image" "$dir"
+              docker push "$image"
+            else
+              echo "No Dockerfile in $dir, skipping container build"
+            fi
+          }
+          build_push frontend frontend
+          build_push todos-api todos-api
+          build_push users-api users-api
+          build_push auth-api auth-api
+          build_push log-message-processor log-message-processor
+
+  #deploy_production:
+   # if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    #name: Deploy to Production (gated)
+    #runs-on: ubuntu-latest
+    #needs: [ build_and_deploy ]
+    #environment: production
+    #steps:
+     # - name: Checkout
+      #  uses: actions/checkout@v4
+      #- name: Deploy
+       # run: |
+        #  echo "Deploying to production..."
+         # echo "Use your IaC/tooling here (e.g., kubectl, helm, terraform apply)"

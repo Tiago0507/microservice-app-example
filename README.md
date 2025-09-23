@@ -2,7 +2,7 @@
 
 Below is a clear branching strategy for both team roles.
 
-## 1.1 Developers – GitHub Flow (2.5%)
+## 1.1 Developers – GitHub Flow
 
 The development team uses GitHub Flow for small and frequent changes with `main` always deployable.
 
@@ -16,7 +16,7 @@ The development team uses GitHub Flow for small and frequent changes with `main`
 
 **Rationale**: simplicity, agility, and short recovery times.
 
-## 1.2 Operations – GitHub Flow (2.5%)
+## 1.2 Operations – GitHub Flow
 
 The operations team also uses GitHub Flow for operational changes and continuous delivery.
 
@@ -148,3 +148,7 @@ terraform destroy
 ```
 
 Confirm the action by typing yes when prompted.
+
+# 3. Archicteture diagram
+![Arquitectura de la aplicación](arch-img/Microservices.png)
+
