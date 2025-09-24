@@ -1,12 +1,8 @@
 name: Infrastructure CI/CD Pipeline
 
-permissions:
-  id-token: write
-  contents: read
-
 on:
   push:
-    branches: [ main, feat/ops/pipelines ]
+    branches: [ main, develop ]
     paths:
       - 'iac/**'
       - '.github/workflows/cicd-infrastructure.yml'
@@ -26,11 +22,14 @@ on:
 env:
   TF_VERSION: '1.6.0'
   # AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  # AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
   # AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
   # AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
   AZURE_CLIENT_ID: "3fe0943f-dc81-4413-9048-3296332bd707"
+  #AZURE_CLIENT_SECRET: "hardcoded-secret-placeholder"
   AZURE_TENANT_ID: "e994072b-523e-4bfe-86e2-442c5e10b244"
   AZURE_SUBSCRIPTION_ID: "3fe0943f-dc81-4413-9048-3296332bd707"
+  VM_PASSWORD: "MySecurePassword123!"
 
 jobs:
   terraform-validate:
@@ -43,13 +42,6 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
-
-    - name: Azure Login
-      uses: azure/login@v1
-      with:
-        client-id: fa8cb416-e90a-439a-a733-f9952cbec5ca
-        tenant-id: e994072b-523e-4bfe-86e2-442c5e10b244
-        subscription-id: 3fe0943f-dc81-4413-9048-3296332bd707
 
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
@@ -69,7 +61,10 @@ jobs:
     - name: Terraform Plan
       run: terraform plan -out=tfplan
       env:
-        TF_VAR_admin_password: "YourComplexPassword123!"
+        ARM_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
+        #ARM_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
+        ARM_TENANT_ID: ${{ env.AZURE_TENANT_ID }}
+        ARM_SUBSCRIPTION_ID: ${{ env.AZURE_SUBSCRIPTION_ID }}
 
     - name: Terraform Show Plan
       run: terraform show -no-color tfplan
@@ -94,13 +89,6 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Azure Login
-      uses: azure/login@v1
-      with:
-        client-id: fa8cb416-e90a-439a-a733-f9952cbec5ca
-        tenant-id: e994072b-523e-4bfe-86e2-442c5e10b244
-        subscription-id: 3fe0943f-dc81-4413-9048-3296332bd707
-
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
       with:
@@ -118,10 +106,20 @@ jobs:
     - name: Terraform Apply
       run: terraform apply -auto-approve tfplan
       env:
-        TF_VAR_admin_password: "YourComplexPassword123!"
+        ARM_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
+        #ARM_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
+        ARM_TENANT_ID: ${{ env.AZURE_TENANT_ID }}
+        ARM_SUBSCRIPTION_ID: ${{ env.AZURE_SUBSCRIPTION_ID }}
+        VM_PASSWORD: ${{ env.VM_PASSWORD }}
 
     - name: Terraform Output
       run: terraform output -json
+      env:
+        ARM_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
+        #ARM_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
+        ARM_TENANT_ID: ${{ env.AZURE_TENANT_ID }}
+        ARM_SUBSCRIPTION_ID: ${{ env.AZURE_SUBSCRIPTION_ID }}
+        VM_PASSWORD: ${{ env.VM_PASSWORD }}
 
   terraform-destroy:
     name: 'Terraform Destroy (Manual)'
@@ -135,13 +133,6 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Azure Login
-      uses: azure/login@v1
-      with:
-        client-id: fa8cb416-e90a-439a-a733-f9952cbec5ca
-        tenant-id: e994072b-523e-4bfe-86e2-442c5e10b244
-        subscription-id: 3fe0943f-dc81-4413-9048-3296332bd707
-
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
       with:
@@ -153,4 +144,8 @@ jobs:
     - name: Terraform Destroy
       run: terraform destroy -auto-approve
       env:
-        TF_VAR_admin_password: "YourComplexPassword123!"
+        ARM_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
+        #ARM_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
+        ARM_TENANT_ID: ${{ env.AZURE_TENANT_ID }}
+        ARM_SUBSCRIPTION_ID: ${{ env.AZURE_SUBSCRIPTION_ID }}
+        VM_PASSWORD: ${{ env.VM_PASSWORD }}
