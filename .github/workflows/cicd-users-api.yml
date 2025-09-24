@@ -88,9 +88,73 @@ jobs:
             set -euo pipefail
             echo "Reconstruyendo y levantando users-api vía Docker Compose"
             cd ${{ env.REMOTE_BASE_DIR }}
+            
+            # Stop and remove all containers using port 8083 (users-api port)
+            echo "Deteniendo contenedores que usan el puerto 8083..."
+            CONTAINERS_USING_PORT=$(docker ps -q --filter "publish=8083" || true)
+            if [ -n "$CONTAINERS_USING_PORT" ]; then
+              echo "Deteniendo contenedores: $CONTAINERS_USING_PORT"
+              docker stop $CONTAINERS_USING_PORT || true
+              docker rm $CONTAINERS_USING_PORT || true
+            fi
+            
+            # Also check for containers with port mapping to 8083
+            CONTAINERS_WITH_USERS_PORT=$(docker ps -q --filter "expose=8083" || true)
+            if [ -n "$CONTAINERS_WITH_USERS_PORT" ]; then
+              echo "Deteniendo contenedores con puerto 8083 expuesto: $CONTAINERS_WITH_USERS_PORT"
+              docker stop $CONTAINERS_WITH_USERS_PORT || true
+              docker rm $CONTAINERS_WITH_USERS_PORT || true
+            fi
+            
+            # Additional cleanup: find and stop any container that might be using port 8083
+            echo "Búsqueda adicional de contenedores usando puerto 8083..."
+            ALL_CONTAINERS=$(docker ps -aq || true)
+            if [ -n "$ALL_CONTAINERS" ]; then
+              for container in $ALL_CONTAINERS; do
+                # Check if container is using port 8083
+                if docker port "$container" 2>/dev/null | grep -q "8083"; then
+                  echo "Deteniendo contenedor $container que usa puerto 8083"
+                  docker stop "$container" || true
+                  docker rm "$container" || true
+                fi
+              done
+            fi
+            
+            # Clean up any existing compose containers
+            echo "Limpiando contenedores de compose existentes..."
+            docker-compose -f docker-compose.yml down --remove-orphans || true
+            docker-compose -f docker-compose.yml rm -fsv || true
+            
+            # Check if port 8083 is still in use after cleanup
+            echo "Verificando disponibilidad del puerto 8083..."
+            if command -v netstat >/dev/null 2>&1; then
+              if netstat -tuln | grep -q ":8083 "; then
+                echo "ADVERTENCIA: El puerto 8083 aún está en uso después de la limpieza"
+                netstat -tuln | grep ":8083 " || true
+              else
+                echo "Puerto 8083 disponible"
+              fi
+            elif command -v ss >/dev/null 2>&1; then
+              if ss -tuln | grep -q ":8083 "; then
+                echo "ADVERTENCIA: El puerto 8083 aún está en uso después de la limpieza"
+                ss -tuln | grep ":8083 " || true
+              else
+                echo "Puerto 8083 disponible"
+              fi
+            fi
+            
+            # Build the users-api service
+            echo "Construyendo users-api..."
             DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker-compose -f docker-compose.yml build users-api
-            docker-compose -f docker-compose.yml rm -fsv users-api || true
+            
+            # Start the service
+            echo "Iniciando users-api..."
             docker-compose -f docker-compose.yml up -d --force-recreate users-api
+            
+            # Wait a moment for service to start
+            sleep 10
+            
+            # Verify users-api is running
             CID=$(docker-compose ps -q users-api || true)
             if [ -z "$CID" ]; then
               echo "No se encontró el contenedor users-api" >&2
