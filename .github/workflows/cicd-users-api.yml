@@ -120,26 +120,34 @@ jobs:
               done
             fi
             
-            # Deep cleanup of Docker resources
-            echo "Limpieza profunda de recursos de Docker..."
+            # Aggressive Docker cleanup to fix ContainerConfig errors
+            echo "Limpieza agresiva de Docker para resolver errores de ContainerConfig..."
             
-            # Stop and remove all containers from the compose project
-            docker-compose -f docker-compose.yml down --remove-orphans --volumes || true
+            # Stop all running containers
+            docker stop $(docker ps -aq) 2>/dev/null || true
             
-            # Remove all stopped containers
-            docker container prune -f || true
+            # Remove all containers
+            docker rm -f $(docker ps -aq) 2>/dev/null || true
             
-            # Remove unused networks
-            docker network prune -f || true
+            # Remove all networks
+            docker network rm $(docker network ls -q) 2>/dev/null || true
             
-            # Remove unused volumes (be careful with this in production)
-            docker volume prune -f || true
+            # Remove all volumes
+            docker volume rm $(docker volume ls -q) 2>/dev/null || true
             
-            # Clean up any remaining containers with the project name
-            docker ps -a --filter "name=microservice-app-example" -q | xargs -r docker rm -f || true
+            # Remove all images
+            docker rmi -f $(docker images -q) 2>/dev/null || true
             
-            # Remove any dangling images
-            docker image prune -f || true
+            # Clean up Docker system completely
+            docker system prune -a --volumes -f || true
+            
+            # Restart Docker daemon to clear any corrupted state
+            echo "Reiniciando daemon de Docker para limpiar estado corrupto..."
+            sudo systemctl restart docker || true
+            sleep 15
+            
+            # Verify Docker is working
+            docker info || { echo "Docker no responde, reintentando..."; sleep 10; docker info; }
             
             # Check if port 8083 is still in use after cleanup
             echo "Verificando disponibilidad del puerto 8083..."
@@ -171,9 +179,21 @@ jobs:
             echo "Construyendo users-api..."
             DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker-compose -f docker-compose.yml build --no-cache users-api
             
-            # Start the service with explicit recreation
+            # Start the service using a different approach to avoid ContainerConfig errors
+            echo "Iniciando users-api con estrategia alternativa..."
+            
+            # First, create the network manually
+            docker network create microservice-app-example_microservices-net 2>/dev/null || true
+            
+            # Start services one by one to avoid ContainerConfig issues
+            echo "Iniciando Redis primero..."
+            docker-compose -f docker-compose.yml up -d redis
+            
+            # Wait for Redis to be ready
+            sleep 10
+            
             echo "Iniciando users-api..."
-            docker-compose -f docker-compose.yml up -d --force-recreate --remove-orphans users-api
+            docker-compose -f docker-compose.yml up -d users-api
             
             # Wait a moment for service to start
             sleep 10
