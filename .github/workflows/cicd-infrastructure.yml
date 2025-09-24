@@ -2,7 +2,7 @@ name: Infrastructure CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, feat/ops/pipelines ]
     paths:
       - 'iac/**'
       - '.github/workflows/cicd-infrastructure.yml'
