@@ -11,6 +11,7 @@ import (
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 	gommonlog "github.com/labstack/gommon/log"
+	"github.com/sony/gobreaker"
 )
 
 var (
@@ -32,6 +33,16 @@ func main() {
 		jwtSecret = envJwtSecret
 	}
 
+	var st gobreaker.Settings
+	st.Name = "users-api"
+	st.MaxRequests = 1 // Peticiones en estado semi-abierto
+	st.Interval = time.Minute * 5 // Ciclo para resetear contadores
+	st.Timeout = time.Second * 10 // Tiempo para pasar de abierto a semi-abierto
+	st.ReadyToTrip = func(counts gobreaker.Counts) bool {
+		// Se abrirá el circuito después de 3 fallos consecutivos
+		return counts.ConsecutiveFailures > 3
+	}
+
 	userService := UserService{
 		Client:         http.DefaultClient,
 		UserAPIAddress: userAPIAddress,
@@ -40,6 +51,7 @@ func main() {
 			"johnd_foo":   nil,
 			"janed_ddd":   nil,
 		},
+		breaker: gobreaker.NewCircuitBreaker(st),
 	}
 
 	e := echo.New()
@@ -90,6 +102,12 @@ func getLoginHandler(userService UserService) echo.HandlerFunc {
 		ctx := c.Request().Context()
 		user, err := userService.Login(ctx, requestData.Username, requestData.Password)
 		if err != nil {
+			if err == gobreaker.ErrOpenState {
+				log.Printf("Petición rechazada para '%s' porque el Circuit Breaker está abierto.", requestData.Username)
+				// Devolvemos 503 Service Unavailable
+				return echo.NewHTTPError(http.StatusServiceUnavailable, "Servicio no disponible, por favor intente más tarde. El circuito está abierto.")
+			}
+
 			if err != ErrWrongCredentials {
 				log.Printf("could not authorize user '%s': %s", requestData.Username, err.Error())
 				return ErrHttpGenericMessage

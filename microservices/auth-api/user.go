@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/sony/gobreaker"
 )
 
 var allowedUserHashes = map[string]interface{}{
@@ -31,6 +32,7 @@ type UserService struct {
 	Client            HTTPDoer
 	UserAPIAddress    string
 	AllowedUserHashes map[string]interface{}
+	breaker           *gobreaker.CircuitBreaker
 }
 
 func (h *UserService) Login(ctx context.Context, username, password string) (User, error) {
@@ -51,33 +53,46 @@ func (h *UserService) Login(ctx context.Context, username, password string) (Use
 func (h *UserService) getUser(ctx context.Context, username string) (User, error) {
 	var user User
 
-	token, err := h.getUserAPIToken(username)
+	// La lógica de la petición ahora se ejecuta dentro del Circuit Breaker
+	body, err := h.breaker.Execute(func() (interface{}, error) {
+		token, err := h.getUserAPIToken(username)
+		if err != nil {
+			return nil, err
+		}
+		url := fmt.Sprintf("%s/users/%s", h.UserAPIAddress, username)
+		req, _ := http.NewRequest("GET", url, nil)
+		req.Header.Add("Authorization", "Bearer "+token)
+		req = req.WithContext(ctx)
+
+		resp, err := h.Client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+
+		defer resp.Body.Close()
+		bodyBytes, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		if resp.StatusCode >= 500 { // Consideramos errores de servidor como fallos
+			return nil, fmt.Errorf("servicio de usuarios no disponible: %s", string(bodyBytes))
+		}
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return nil, fmt.Errorf("no se pudieron obtener los datos del usuario: %s", string(bodyBytes))
+		}
+
+		return bodyBytes, nil
+	})
+
 	if err != nil {
+		// Si el error es del circuit breaker, este error se propagará
 		return user, err
 	}
-	url := fmt.Sprintf("%s/users/%s", h.UserAPIAddress, username)
-	req, _ := http.NewRequest("GET", url, nil)
-	req.Header.Add("Authorization", "Bearer "+token)
 
-	req = req.WithContext(ctx)
-
-	resp, err := h.Client.Do(req)
-	if err != nil {
-		return user, err
-	}
-
-	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return user, err
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return user, fmt.Errorf("could not get user data: %s", string(bodyBytes))
-	}
-
-	err = json.Unmarshal(bodyBytes, &user)
-
+	// Si la petición fue exitosa, decodificamos el cuerpo
+	err = json.Unmarshal(body.([]byte), &user)
 	return user, err
 }
 
