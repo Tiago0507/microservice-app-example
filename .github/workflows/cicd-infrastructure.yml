@@ -1,0 +1,54 @@
+name: Infraestructura - Deploy con Terraform
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'iac/**' # Se activa solo con cambios en la carpeta de infraestructura
+      - '.github/workflows/cicd-infrastructure.yml'
+  workflow_dispatch: # Permite ejecutarlo manualmente
+
+jobs:
+  terraform-deploy:
+    runs-on: ubuntu-latest
+    env:
+      # Configura tus credenciales de Azure como secretos en GitHub
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      # La contraseña de la VM para Terraform
+      TF_VAR_admin_password: ${{ secrets.SSH_PASSWORD }}
+
+    steps:
+      - name: 1. Checkout del código
+        uses: actions/checkout@v4
+
+      - name: 2. Configurar Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+
+      - name: 3. Terraform Init
+        run: terraform init
+        working-directory: ./iac
+
+      - name: 4. Terraform Apply
+        id: apply # Le damos un ID a este paso para poder usar su output
+        run: terraform apply -auto-approve
+        working-directory: ./iac
+        
+      - name: 5. Obtener la IP pública de la VM
+        id: get_ip # Le damos un ID a este paso
+        run: |
+          VM_PUBLIC_IP=$(terraform output -raw vm_public_ip)
+          echo "La IP pública de la VM es: $VM_PUBLIC_IP"
+          echo "VM_IP=$VM_PUBLIC_IP" >> $GITHUB_ENV
+        working-directory: ./iac
+
+      - name: 6. Actualizar el secreto SSH_HOST en GitHub
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # El token por defecto de la Action
+        run: |
+          gh secret set SSH_HOST --body "${{ env.VM_IP }}"
+          echo "Secreto SSH_HOST actualizado en GitHub con la IP: ${{ env.VM_IP }}"

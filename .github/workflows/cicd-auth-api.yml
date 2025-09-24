@@ -1,4 +1,4 @@
-name: Auth API - Dev Build & Deploy
+name: Auth API - Build & Deploy
 
 on:
   push:
@@ -7,8 +7,7 @@ on:
       - 'microservices/auth-api/**'
       - '.github/workflows/cicd-auth-api.yml'
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
     paths:
       - 'microservices/auth-api/**'
 
@@ -17,95 +16,56 @@ jobs:
     runs-on: ubuntu-latest
     env:
       REMOTE_BASE_DIR: ~/microservice-app-example
-      REMOTE_SERVICE_DIR: ~/microservice-app-example/auth-api
-      SSH_HOST: 135.119.192.44
-      SSH_USERNAME: adminuser
-      SSH_PASSWORD: YourComplexPassword123!
-      SSH_PORT: 22
+      SERVICE_NAME: auth-api
+
     steps:
-      - name: Checkout
+      - name: 1. Checkout del código
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Check SSH reachability (port 22)
-        run: |
-          for i in {1..12}; do
-            if timeout 5 bash -c "echo > /dev/tcp/${{ env.SSH_HOST }}/22" 2>/dev/null; then
-              echo "SSH port reachable"; exit 0; fi; echo "Waiting for SSH... ($i)"; sleep 5; done; echo "SSH not reachable" >&2; exit 1
-
-      - name: Ensure remote directory exists
-        uses: appleboy/ssh-action@v1.1.0
+      - name: 2. Crear directorios y copiar archivos necesarios
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ env.SSH_HOST }}
-          username: ${{ env.SSH_USERNAME }}
-          password: ${{ env.SSH_PASSWORD }}
-          port: ${{ env.SSH_PORT }}
-          timeout: 120s
-          command_timeout: 20m
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: ${{ secrets.SSH_PORT }}
           script: |
-            mkdir -p ${{ env.REMOTE_BASE_DIR }}
-            mkdir -p ${{ env.REMOTE_SERVICE_DIR }}
+            mkdir -p ${{ env.REMOTE_BASE_DIR }}/microservices/${{ env.SERVICE_NAME }}
 
-      - name: Copy compose files to remote base dir
+      - name: 3. Copiar archivos de Docker Compose
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ env.SSH_HOST }}
-          username: ${{ env.SSH_USERNAME }}
-          password: ${{ env.SSH_PASSWORD }}
-          port: ${{ env.SSH_PORT }}
-          timeout: 120s
-          source: "docker-compose*.yml"
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: "docker-compose.yml,docker-compose.prod.yml"
           target: ${{ env.REMOTE_BASE_DIR }}
-
-      - name: Copy microservices folder to remote base dir
+          
+      - name: 4. Copiar código del microservicio
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ env.SSH_HOST }}
-          username: ${{ env.SSH_USERNAME }}
-          password: ${{ env.SSH_PASSWORD }}
-          port: ${{ env.SSH_PORT }}
-          timeout: 180s
-          source: "microservices/**"
-          target: ${{ env.REMOTE_BASE_DIR }}
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: "microservices/${{ env.SERVICE_NAME }}"
+          target: "${{ env.REMOTE_BASE_DIR }}/microservices/"
 
-      - name: Copy auth-api to remote host
-        uses: appleboy/scp-action@v0.1.7
+      - name: 5. Reconstruir y reiniciar el servicio con Docker Compose
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ env.SSH_HOST }}
-          username: ${{ env.SSH_USERNAME }}
-          password: ${{ env.SSH_PASSWORD }}
-          port: ${{ env.SSH_PORT }}
-          timeout: 120s
-          source: "microservices/auth-api/**"
-          target: ${{ env.REMOTE_SERVICE_DIR }}
-          strip_components: 2
-
-      - name: Build and restart auth-api with Docker Compose
-        uses: appleboy/ssh-action@v1.1.0
-        with:
-          host: ${{ env.SSH_HOST }}
-          username: ${{ env.SSH_USERNAME }}
-          password: ${{ env.SSH_PASSWORD }}
-          port: ${{ env.SSH_PORT }}
-          timeout: 180s
-          command_timeout: 30m
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: ${{ secrets.SSH_PORT }}
           script: |
-            set -euo pipefail
-            echo "Reconstruyendo y levantando auth-api vía Docker Compose"
+            set -e
             cd ${{ env.REMOTE_BASE_DIR }}
-            DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker-compose -f docker-compose.yml build auth-api
-            docker-compose -f docker-compose.yml rm -fsv auth-api users-api redis || true
-            docker-compose -f docker-compose.yml up -d --force-recreate auth-api
-            CID=$(docker-compose ps -q auth-api || true)
-            if [ -z "$CID" ]; then
-              echo "No se encontró el contenedor auth-api" >&2
-              exit 1
-            fi
-            RUNNING=$(docker inspect -f '{{.State.Running}}' "$CID")
-            if [ "$RUNNING" != "true" ]; then
-              echo "El contenedor auth-api no está en ejecución" >&2
-              docker logs "$CID" || true
-              exit 1
-            fi
-            echo "auth-api desplegado correctamente"
+            echo "--> Reconstruyendo el contenedor de ${{ env.SERVICE_NAME }}..."
+            docker-compose build --no-cache ${{ env.SERVICE_NAME }}
+            
+            echo "--> Reiniciando el contenedor de ${{ env.SERVICE_NAME }}..."
+            docker-compose up -d --force-recreate ${{ env.SERVICE_NAME }}
+            
+            echo "--> Verificando el estado del contenedor..."
+            docker-compose ps ${{ env.SERVICE_NAME }}
+            echo "Despliegue de ${{ env.SERVICE_NAME }} completado."
