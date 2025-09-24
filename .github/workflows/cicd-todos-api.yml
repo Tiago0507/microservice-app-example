@@ -111,14 +111,31 @@ jobs:
               docker rm $CONTAINERS_WITH_REDIS_PORT || true
             fi
             
-            # Additional cleanup: find and stop any container that might be using port 6379
-            echo "Búsqueda adicional de contenedores usando puerto 6379..."
+            # Stop and remove all containers using port 8082 (todos-api port)
+            echo "Deteniendo contenedores que usan el puerto 8082..."
+            CONTAINERS_USING_TODOS_PORT=$(docker ps -q --filter "publish=8082" || true)
+            if [ -n "$CONTAINERS_USING_TODOS_PORT" ]; then
+              echo "Deteniendo contenedores: $CONTAINERS_USING_TODOS_PORT"
+              docker stop $CONTAINERS_USING_TODOS_PORT || true
+              docker rm $CONTAINERS_USING_TODOS_PORT || true
+            fi
+            
+            # Also check for containers with port mapping to 8082
+            CONTAINERS_WITH_TODOS_PORT=$(docker ps -q --filter "expose=8082" || true)
+            if [ -n "$CONTAINERS_WITH_TODOS_PORT" ]; then
+              echo "Deteniendo contenedores con puerto 8082 expuesto: $CONTAINERS_WITH_TODOS_PORT"
+              docker stop $CONTAINERS_WITH_TODOS_PORT || true
+              docker rm $CONTAINERS_WITH_TODOS_PORT || true
+            fi
+            
+            # Additional cleanup: find and stop any container that might be using ports 6379 or 8082
+            echo "Búsqueda adicional de contenedores usando puertos 6379 y 8082..."
             ALL_CONTAINERS=$(docker ps -aq || true)
             if [ -n "$ALL_CONTAINERS" ]; then
               for container in $ALL_CONTAINERS; do
-                # Check if container is using port 6379
-                if docker port "$container" 2>/dev/null | grep -q "6379"; then
-                  echo "Deteniendo contenedor $container que usa puerto 6379"
+                # Check if container is using port 6379 or 8082
+                if docker port "$container" 2>/dev/null | grep -q "6379\|8082"; then
+                  echo "Deteniendo contenedor $container que usa puerto 6379 o 8082"
                   docker stop "$container" || true
                   docker rm "$container" || true
                 fi
@@ -130,8 +147,8 @@ jobs:
             docker-compose -f docker-compose.yml down --remove-orphans || true
             docker-compose -f docker-compose.yml rm -fsv || true
             
-            # Check if port 6379 is still in use after cleanup
-            echo "Verificando disponibilidad del puerto 6379..."
+            # Check if ports 6379 and 8082 are still in use after cleanup
+            echo "Verificando disponibilidad de los puertos 6379 y 8082..."
             if command -v netstat >/dev/null 2>&1; then
               if netstat -tuln | grep -q ":6379 "; then
                 echo "ADVERTENCIA: El puerto 6379 aún está en uso después de la limpieza"
@@ -139,12 +156,24 @@ jobs:
               else
                 echo "Puerto 6379 disponible"
               fi
+              if netstat -tuln | grep -q ":8082 "; then
+                echo "ADVERTENCIA: El puerto 8082 aún está en uso después de la limpieza"
+                netstat -tuln | grep ":8082 " || true
+              else
+                echo "Puerto 8082 disponible"
+              fi
             elif command -v ss >/dev/null 2>&1; then
               if ss -tuln | grep -q ":6379 "; then
                 echo "ADVERTENCIA: El puerto 6379 aún está en uso después de la limpieza"
                 ss -tuln | grep ":6379 " || true
               else
                 echo "Puerto 6379 disponible"
+              fi
+              if ss -tuln | grep -q ":8082 "; then
+                echo "ADVERTENCIA: El puerto 8082 aún está en uso después de la limpieza"
+                ss -tuln | grep ":8082 " || true
+              else
+                echo "Puerto 8082 disponible"
               fi
             fi
             
