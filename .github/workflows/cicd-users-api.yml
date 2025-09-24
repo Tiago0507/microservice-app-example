@@ -120,10 +120,26 @@ jobs:
               done
             fi
             
-            # Clean up any existing compose containers
-            echo "Limpiando contenedores de compose existentes..."
-            docker-compose -f docker-compose.yml down --remove-orphans || true
-            docker-compose -f docker-compose.yml rm -fsv || true
+            # Deep cleanup of Docker resources
+            echo "Limpieza profunda de recursos de Docker..."
+            
+            # Stop and remove all containers from the compose project
+            docker-compose -f docker-compose.yml down --remove-orphans --volumes || true
+            
+            # Remove all stopped containers
+            docker container prune -f || true
+            
+            # Remove unused networks
+            docker network prune -f || true
+            
+            # Remove unused volumes (be careful with this in production)
+            docker volume prune -f || true
+            
+            # Clean up any remaining containers with the project name
+            docker ps -a --filter "name=microservice-app-example" -q | xargs -r docker rm -f || true
+            
+            # Remove any dangling images
+            docker image prune -f || true
             
             # Check if port 8083 is still in use after cleanup
             echo "Verificando disponibilidad del puerto 8083..."
@@ -143,13 +159,21 @@ jobs:
               fi
             fi
             
+            # Restart Docker daemon if needed (this helps with ContainerConfig errors)
+            echo "Verificando estado del daemon de Docker..."
+            if ! docker info >/dev/null 2>&1; then
+              echo "Reiniciando daemon de Docker..."
+              sudo systemctl restart docker || true
+              sleep 10
+            fi
+            
             # Build the users-api service
             echo "Construyendo users-api..."
-            DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker-compose -f docker-compose.yml build users-api
+            DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker-compose -f docker-compose.yml build --no-cache users-api
             
-            # Start the service
+            # Start the service with explicit recreation
             echo "Iniciando users-api..."
-            docker-compose -f docker-compose.yml up -d --force-recreate users-api
+            docker-compose -f docker-compose.yml up -d --force-recreate --remove-orphans users-api
             
             # Wait a moment for service to start
             sleep 10
