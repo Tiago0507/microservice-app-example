@@ -29,7 +29,6 @@ env:
   # AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
   # AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
   AZURE_CLIENT_ID: "3fe0943f-dc81-4413-9048-3296332bd707"
-  #AZURE_CLIENT_SECRET: "TU_SECRET_REAL_AQUI"
   AZURE_TENANT_ID: "e994072b-523e-4bfe-86e2-442c5e10b244"
   AZURE_SUBSCRIPTION_ID: "3fe0943f-dc81-4413-9048-3296332bd707"
 
@@ -48,7 +47,7 @@ jobs:
     - name: Azure Login
       uses: azure/login@v1
       with:
-        client-id: 3fe0943f-dc81-4413-9048-3296332bd707
+        client-id: fa8cb416-e90a-439a-a733-f9952cbec5ca
         tenant-id: e994072b-523e-4bfe-86e2-442c5e10b244
         subscription-id: 3fe0943f-dc81-4413-9048-3296332bd707
 
@@ -98,7 +97,7 @@ jobs:
     - name: Azure Login
       uses: azure/login@v1
       with:
-        client-id: 3fe0943f-dc81-4413-9048-3296332bd707
+        client-id: fa8cb416-e90a-439a-a733-f9952cbec5ca
         tenant-id: e994072b-523e-4bfe-86e2-442c5e10b244
         subscription-id: 3fe0943f-dc81-4413-9048-3296332bd707
 
@@ -139,7 +138,7 @@ jobs:
     - name: Azure Login
       uses: azure/login@v1
       with:
-        client-id: 3fe0943f-dc81-4413-9048-3296332bd707
+        client-id: fa8cb416-e90a-439a-a733-f9952cbec5ca
         tenant-id: e994072b-523e-4bfe-86e2-442c5e10b244
         subscription-id: 3fe0943f-dc81-4413-9048-3296332bd707
 
