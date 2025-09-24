@@ -3,13 +3,8 @@ name: Users API - Dev Build & Deploy
 on:
   push:
     branches: [ main, feat/dev/pipelines ]
-    paths:
-      - 'microservices/users-api/**'
-      - '.github/workflows/cicd-users-api.yml'
   pull_request:
     branches: [ main ]
-    paths:
-      - 'microservices/users-api/**'
 
 jobs:
   build-and-deploy:

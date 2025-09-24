@@ -3,13 +3,8 @@ name: Log Message Processor - Dev Build & Deploy
 on:
   push:
     branches: [ main, feat/dev/pipelines ]
-    paths:
-      - 'microservices/log-message-processor/**'
-      - '.github/workflows/cicd-log-processor.yml'
   pull_request:
     branches: [ main ]
-    paths:
-      - 'microservices/log-message-processor/**'
 
 jobs:
   build-and-deploy:

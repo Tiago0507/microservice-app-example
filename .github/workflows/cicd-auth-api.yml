@@ -3,13 +3,8 @@ name: Auth API - Dev Build & Deploy
 on:
   push:
     branches: [ main, feat/dev/pipelines ]
-    paths:
-      - 'microservices/auth-api/**'
-      - '.github/workflows/cicd-auth-api.yml'
   pull_request:
     branches: [ main ]
-    paths:
-      - 'microservices/auth-api/**'
 
 jobs:
   build-and-deploy:

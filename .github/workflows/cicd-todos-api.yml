@@ -3,13 +3,8 @@ name: TODOS API - Dev Build & Deploy
 on:
   push:
     branches: [ main, feat/dev/pipelines ]
-    paths:
-      - 'microservices/todos-api/**'
-      - '.github/workflows/cicd-todos-api.yml'
   pull_request:
     branches: [ main ]
-    paths:
-      - 'microservices/todos-api/**'
 
 jobs:
   build-and-deploy:
