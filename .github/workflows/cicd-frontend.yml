@@ -88,9 +88,45 @@ jobs:
             set -euo pipefail
             echo "Reconstruyendo y levantando frontend vía Docker Compose"
             cd ${{ env.REMOTE_BASE_DIR }}
-            DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker-compose -f docker-compose.yml build frontend
-            docker-compose -f docker-compose.yml rm -fsv frontend auth-api todos-api redis users-api || true
-            docker-compose -f docker-compose.yml up -d --force-recreate frontend
+            
+            # Stop and remove all containers using port 8080 (frontend port)
+            echo "Deteniendo contenedores que usan el puerto 8080..."
+            CONTAINERS_USING_PORT=$(docker ps -q --filter "publish=8080" || true)
+            if [ -n "$CONTAINERS_USING_PORT" ]; then
+              echo "Deteniendo contenedores: $CONTAINERS_USING_PORT"
+              docker stop $CONTAINERS_USING_PORT || true
+              docker rm $CONTAINERS_USING_PORT || true
+            fi
+            
+            # Deep cleanup of Docker resources
+            echo "Limpieza profunda de recursos de Docker..."
+            docker-compose -f docker-compose.yml down --remove-orphans --volumes || true
+            docker container prune -f || true
+            docker network prune -f || true
+            docker volume prune -f || true
+            docker ps -a --filter "name=microservice-app-example" -q | xargs -r docker rm -f || true
+            docker image prune -f || true
+            
+            # Restart Docker daemon if needed
+            echo "Verificando estado del daemon de Docker..."
+            if ! docker info >/dev/null 2>&1; then
+              echo "Reiniciando daemon de Docker..."
+              sudo systemctl restart docker || true
+              sleep 10
+            fi
+            
+            # Build the frontend service
+            echo "Construyendo frontend..."
+            DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker-compose -f docker-compose.yml build --no-cache frontend
+            
+            # Start all services (frontend depends on auth-api and todos-api)
+            echo "Iniciando servicios..."
+            docker-compose -f docker-compose.yml up -d --force-recreate --remove-orphans users-api redis auth-api todos-api frontend
+            
+            # Wait for services to start
+            sleep 20
+            
+            # Verify frontend is running
             CID=$(docker-compose ps -q frontend || true)
             if [ -z "$CID" ]; then
               echo "No se encontró el contenedor frontend" >&2

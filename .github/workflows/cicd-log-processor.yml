@@ -88,9 +88,36 @@ jobs:
             set -euo pipefail
             echo "Reconstruyendo y levantando log-message-processor vía Docker Compose"
             cd ${{ env.REMOTE_BASE_DIR }}
-            DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker-compose -f docker-compose.yml build log-message-processor
-            docker-compose -f docker-compose.yml rm -fsv log-message-processor redis || true
-            docker-compose -f docker-compose.yml up -d --force-recreate log-message-processor
+            
+            # Deep cleanup of Docker resources
+            echo "Limpieza profunda de recursos de Docker..."
+            docker-compose -f docker-compose.yml down --remove-orphans --volumes || true
+            docker container prune -f || true
+            docker network prune -f || true
+            docker volume prune -f || true
+            docker ps -a --filter "name=microservice-app-example" -q | xargs -r docker rm -f || true
+            docker image prune -f || true
+            
+            # Restart Docker daemon if needed
+            echo "Verificando estado del daemon de Docker..."
+            if ! docker info >/dev/null 2>&1; then
+              echo "Reiniciando daemon de Docker..."
+              sudo systemctl restart docker || true
+              sleep 10
+            fi
+            
+            # Build the log-message-processor service
+            echo "Construyendo log-message-processor..."
+            DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker-compose -f docker-compose.yml build --no-cache log-message-processor
+            
+            # Start the services (log-message-processor depends on redis)
+            echo "Iniciando servicios..."
+            docker-compose -f docker-compose.yml up -d --force-recreate --remove-orphans redis log-message-processor
+            
+            # Wait for services to start
+            sleep 10
+            
+            # Verify log-message-processor is running
             CID=$(docker-compose ps -q log-message-processor || true)
             if [ -z "$CID" ]; then
               echo "No se encontró el contenedor log-message-processor" >&2
