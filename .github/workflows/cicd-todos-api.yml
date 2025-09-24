@@ -2,13 +2,12 @@ name: TODOS API - Dev Build & Deploy
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, feat/dev/pipelines ]
     paths:
       - 'microservices/todos-api/**'
       - '.github/workflows/cicd-todos-api.yml'
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
     paths:
       - 'microservices/todos-api/**'
 
@@ -18,7 +17,7 @@ jobs:
     env:
       REMOTE_BASE_DIR: ~/microservice-app-example
       REMOTE_SERVICE_DIR: ~/microservice-app-example/todos-api
-      SSH_HOST: 135.119.192.44
+      SSH_HOST: 128.24.80.61
       SSH_USERNAME: adminuser
       SSH_PASSWORD: YourComplexPassword123!
       SSH_PORT: 22
@@ -95,6 +94,7 @@ jobs:
             echo "Reconstruyendo y levantando todos-api vía Docker Compose"
             cd ${{ env.REMOTE_BASE_DIR }}
             docker-compose -f docker-compose.yml build todos-api
+            docker-compose -f docker-compose.yml rm -fsv todos-api redis || true
             docker-compose -f docker-compose.yml up -d --force-recreate todos-api
             CID=$(docker-compose ps -q todos-api || true)
             if [ -z "$CID" ]; then

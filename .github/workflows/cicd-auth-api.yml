@@ -2,13 +2,12 @@ name: Auth API - Dev Build & Deploy
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, feat/dev/pipelines ]
     paths:
       - 'microservices/auth-api/**'
       - '.github/workflows/cicd-auth-api.yml'
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
     paths:
       - 'microservices/auth-api/**'
 
@@ -18,7 +17,7 @@ jobs:
     env:
       REMOTE_BASE_DIR: ~/microservice-app-example
       REMOTE_SERVICE_DIR: ~/microservice-app-example/auth-api
-      SSH_HOST: 135.119.192.44
+      SSH_HOST: 128.24.80.61
       SSH_USERNAME: adminuser
       SSH_PASSWORD: YourComplexPassword123!
       SSH_PORT: 22

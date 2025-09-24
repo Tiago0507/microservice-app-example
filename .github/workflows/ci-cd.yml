@@ -104,7 +104,7 @@ jobs:
           if ls -1 tests 2>/dev/null | grep -q .; then pytest -q; else echo "No tests"; fi
 
   build_and_deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    #if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     name: Build, Test, Deploy
     runs-on: ubuntu-latest
     environment: staging

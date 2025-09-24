@@ -2,7 +2,7 @@ name: CI - Docker Compose Health Checks
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, feat/dev/pipelines ]
   pull_request:
     branches: [ main ]
 

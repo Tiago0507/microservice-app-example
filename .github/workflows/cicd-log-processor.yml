@@ -2,13 +2,12 @@ name: Log Message Processor - Dev Build & Deploy
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, feat/dev/pipelines ]
     paths:
       - 'microservices/log-message-processor/**'
       - '.github/workflows/cicd-log-processor.yml'
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
     paths:
       - 'microservices/log-message-processor/**'
 
@@ -18,7 +17,7 @@ jobs:
     env:
       REMOTE_BASE_DIR: ~/microservice-app-example
       REMOTE_SERVICE_DIR: ~/microservice-app-example/log-message-processor
-      SSH_HOST: 135.119.192.44
+      SSH_HOST: 128.24.80.61
       SSH_USERNAME: adminuser
       SSH_PASSWORD: YourComplexPassword123!
       SSH_PORT: 22
