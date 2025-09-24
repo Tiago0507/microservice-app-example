@@ -1,0 +1,12 @@
+# Archivo de ejemplo para las variables de Terraform
+# Copia este archivo como terraform.tfvars y configura los valores
+
+# Contraseña del administrador de la VM
+admin_password = "tu_password_seguro_aqui"
+
+# Opcional: Personalizar otros valores
+# resource_group_name = "mi-grupo-recursos"
+# location = "eastus2"
+# vnet_name = "mi-red-virtual"
+# subnet_name = "mi-subred"
+# admin_username = "mi_usuario"

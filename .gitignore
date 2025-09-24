@@ -6,3 +6,4 @@ iac/terraform.tfstate.backup
 iac/.terraform.lock.hcl
 iac/.terraform
 iac/.terraform.tfstate.lock.info
+.vscode
