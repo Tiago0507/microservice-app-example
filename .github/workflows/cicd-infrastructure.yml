@@ -1,5 +1,9 @@
 name: Infrastructure CI/CD Pipeline
 
+permissions:
+  id-token: write
+  contents: read
+
 on:
   push:
     branches: [ main, feat/ops/pipelines ]
@@ -40,6 +44,13 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        client-id: 3fe0943f-dc81-4413-9048-3296332bd707
+        tenant-id: e994072b-523e-4bfe-86e2-442c5e10b244
+        subscription-id: 3fe0943f-dc81-4413-9048-3296332bd707
 
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
@@ -84,6 +95,13 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        client-id: 3fe0943f-dc81-4413-9048-3296332bd707
+        tenant-id: e994072b-523e-4bfe-86e2-442c5e10b244
+        subscription-id: 3fe0943f-dc81-4413-9048-3296332bd707
+
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
       with:
@@ -117,6 +135,13 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        client-id: 3fe0943f-dc81-4413-9048-3296332bd707
+        tenant-id: e994072b-523e-4bfe-86e2-442c5e10b244
+        subscription-id: 3fe0943f-dc81-4413-9048-3296332bd707
 
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
