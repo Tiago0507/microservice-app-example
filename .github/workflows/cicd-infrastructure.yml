@@ -59,10 +59,7 @@ jobs:
     - name: Terraform Plan
       run: terraform plan -out=tfplan
       env:
-        ARM_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
-        #ARM_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
-        ARM_TENANT_ID: ${{ env.AZURE_TENANT_ID }}
-        ARM_SUBSCRIPTION_ID: ${{ env.AZURE_SUBSCRIPTION_ID }}
+        TF_VAR_admin_password: "YourComplexPassword123!"
 
     - name: Terraform Show Plan
       run: terraform show -no-color tfplan
@@ -104,18 +101,10 @@ jobs:
     - name: Terraform Apply
       run: terraform apply -auto-approve tfplan
       env:
-        ARM_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
-        #ARM_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
-        ARM_TENANT_ID: ${{ env.AZURE_TENANT_ID }}
-        ARM_SUBSCRIPTION_ID: ${{ env.AZURE_SUBSCRIPTION_ID }}
+        TF_VAR_admin_password: "YourComplexPassword123!"
 
     - name: Terraform Output
       run: terraform output -json
-      env:
-        ARM_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
-        #ARM_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
-        ARM_TENANT_ID: ${{ env.AZURE_TENANT_ID }}
-        ARM_SUBSCRIPTION_ID: ${{ env.AZURE_SUBSCRIPTION_ID }}
 
   terraform-destroy:
     name: 'Terraform Destroy (Manual)'
@@ -140,7 +129,4 @@ jobs:
     - name: Terraform Destroy
       run: terraform destroy -auto-approve
       env:
-        ARM_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
-        #ARM_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
-        ARM_TENANT_ID: ${{ env.AZURE_TENANT_ID }}
-        ARM_SUBSCRIPTION_ID: ${{ env.AZURE_SUBSCRIPTION_ID }}
+        TF_VAR_admin_password: "YourComplexPassword123!"
