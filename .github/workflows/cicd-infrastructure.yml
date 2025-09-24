@@ -21,10 +21,6 @@ on:
 
 env:
   TF_VERSION: '1.6.0'
-  # AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-  # AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-  # AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-  # AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
   AZURE_CLIENT_ID: "3fe0943f-dc81-4413-9048-3296332bd707"
   #AZURE_CLIENT_SECRET: "hardcoded-secret-placeholder"
   AZURE_TENANT_ID: "e994072b-523e-4bfe-86e2-442c5e10b244"
@@ -59,22 +55,13 @@ jobs:
       run: terraform validate
 
     - name: Terraform Plan
-      run: terraform plan -out=tfplan
+      run: terraform plan
       env:
         ARM_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
         #ARM_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
         ARM_TENANT_ID: ${{ env.AZURE_TENANT_ID }}
         ARM_SUBSCRIPTION_ID: ${{ env.AZURE_SUBSCRIPTION_ID }}
 
-    - name: Terraform Show Plan
-      run: terraform show -no-color tfplan
-
-    - name: Upload Plan Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: terraform-plan
-        path: iac/tfplan
-        retention-days: 5
 
   terraform-apply:
     name: 'Terraform Apply'
