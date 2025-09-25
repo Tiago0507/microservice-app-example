@@ -23,9 +23,3 @@ variable "admin_password" {
   type        = string
   sensitive   = true
 }
-
-variable "cloud_init_content" {
-  description = "El contenido del archivo cloud-init para el custom_data de la VM."
-  type        = string
-  sensitive   = true
-}

@@ -1,5 +1,5 @@
 ---
 - name: Desplegar Microservicio en VM de Azure
-  hosts: vm
+  hosts: all
   roles:
     - role: deploy

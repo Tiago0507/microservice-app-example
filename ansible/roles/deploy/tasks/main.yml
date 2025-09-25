@@ -1,5 +1,23 @@
 ---
-- name: 1. Clonar o actualizar el repositorio del proyecto
+- name: 1. Verificar que Docker esté disponible
+  ansible.builtin.command: which docker
+  register: docker_path
+  changed_when: false
+  failed_when: docker_path.rc != 0
+
+- name: 2. Verificar que Docker Compose esté disponible
+  ansible.builtin.command: docker compose version
+  register: docker_compose_check
+  changed_when: false
+  failed_when: docker_compose_check.rc != 0
+
+- name: 3. Mostrar información de Docker
+  ansible.builtin.debug:
+    msg: 
+      - "Docker path: {{ docker_path.stdout }}"
+      - "Docker Compose: {{ docker_compose_check.stdout }}"
+
+- name: 4. Clonar o actualizar el repositorio del proyecto
   ansible.builtin.git:
     repo: "https://github.com/{{ github_repository }}.git"
     dest: "{{ project_dir }}"
@@ -7,32 +25,57 @@
     force: yes
   become: no
 
-- name: 2. Crear archivo .env con el nombre de usuario de DockerHub
+- name: 5. Crear archivo .env con el nombre de usuario de DockerHub
   ansible.builtin.template:
     src: .env.j2
     dest: "{{ project_dir }}/.env"
+    mode: '0644'
   become: no
 
-- name: 3. Descargar la última imagen de Docker del servicio
-  community.docker.docker_compose:
-    project_src: "{{ project_dir }}"
-    files:
-      - docker-compose.prod.yml
-    pull: yes
-    services:
-      - "{{ service_name }}"
+- name: 6. Verificar que existe el archivo docker-compose.prod.yml
+  ansible.builtin.stat:
+    path: "{{ project_dir }}/docker-compose.prod.yml"
+  register: compose_file
 
-- name: 4. Reiniciar el contenedor del servicio con Docker Compose
-  community.docker.docker_compose:
-    project_src: "{{ project_dir }}"
-    files:
-      - docker-compose.prod.yml
-    services:
-      - "{{ service_name }}"
-    restarted: yes
-    recreate: always
+- name: 7. Fallar si no existe docker-compose.prod.yml
+  ansible.builtin.fail:
+    msg: "El archivo docker-compose.prod.yml no existe en {{ project_dir }}"
+  when: not compose_file.stat.exists
 
-- name: 5. Limpiar imágenes de Docker antiguas (prune)
+- name: 8. Detener contenedor existente si está corriendo
+  ansible.builtin.shell:
+    cmd: "docker compose -f docker-compose.prod.yml down {{ service_name }}"
+    chdir: "{{ project_dir }}"
+  ignore_errors: yes
+  become: yes
+
+- name: 9. Descargar la imagen más reciente y reiniciar el servicio
+  ansible.builtin.shell:
+    cmd: "docker compose -f docker-compose.prod.yml pull {{ service_name }} && docker compose -f docker-compose.prod.yml up -d"
+    chdir: "{{ project_dir }}"
+  register: deploy_result
+  become: yes
+  retries: 3
+  delay: 10
+
+- name: 10. Mostrar resultado del despliegue
+  ansible.builtin.debug:
+    msg: "{{ deploy_result.stdout }}"
+
+- name: 11. Verificar que el contenedor esté corriendo
+  ansible.builtin.shell:
+    cmd: "docker compose -f docker-compose.prod.yml ps {{ service_name }}"
+    chdir: "{{ project_dir }}"
+  register: container_status
+  become: yes
+
+- name: 12. Mostrar estado del contenedor
+  ansible.builtin.debug:
+    msg: "{{ container_status.stdout }}"
+
+- name: 13. Limpiar imágenes de Docker antiguas (prune)
   community.docker.docker_prune:
     images: yes
-    force: yes
+    images_filters:
+      dangling: false
+  become: yes
