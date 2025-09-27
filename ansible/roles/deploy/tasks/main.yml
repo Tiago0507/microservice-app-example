@@ -1,0 +1,38 @@
+---
+- name: 1. Clonar o actualizar el repositorio del proyecto
+  ansible.builtin.git:
+    repo: "https://github.com/{{ github_repository }}.git"
+    dest: "{{ project_dir }}"
+    version: main
+    force: yes
+  become: no
+
+- name: 2. Crear archivo .env con el nombre de usuario de DockerHub
+  ansible.builtin.template:
+    src: .env.j2
+    dest: "{{ project_dir }}/.env"
+  become: no
+
+- name: 3. Descargar la última imagen de Docker del servicio
+  community.docker.docker_compose:
+    project_src: "{{ project_dir }}"
+    files:
+      - docker-compose.prod.yml
+    pull: yes
+    services:
+      - "{{ service_name }}"
+
+- name: 4. Reiniciar el contenedor del servicio con Docker Compose
+  community.docker.docker_compose:
+    project_src: "{{ project_dir }}"
+    files:
+      - docker-compose.prod.yml
+    services:
+      - "{{ service_name }}"
+    restarted: yes
+    recreate: always
+
+- name: 5. Limpiar imágenes de Docker antiguas (prune)
+  community.docker.docker_prune:
+    images: yes
+    force: yes
