@@ -1,13 +1,13 @@
 services:
   frontend:
-    image: santiagovg/frontend
+    image: ${DOCKERHUB_USERNAME}/frontend
     ports:
       - "8080:80"
     networks:
       - microservices-net
 
   auth-api:
-    image: santiagovg/auth-api
+    image: ${DOCKERHUB_USERNAME}/auth-api
     ports:
       - "8000:8000"
     environment:
@@ -19,7 +19,7 @@ services:
       - microservices-net
 
   users-api:
-    image: santiagovg/users-api
+    image: ${DOCKERHUB_USERNAME}/users-api
     ports:
       - "8083:8083"
     expose:
@@ -32,7 +32,7 @@ services:
       - microservices-net
 
   todos-api:
-    image: santiagovg/todos-api
+    image: ${DOCKERHUB_USERNAME}/todos-api
     ports:
       - "8082:8082"
     environment:
@@ -46,7 +46,7 @@ services:
       - microservices-net
 
   log-message-processor:
-    image: santiagovg/log-message-processor
+    image: ${DOCKERHUB_USERNAME}/log-message-processor
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379

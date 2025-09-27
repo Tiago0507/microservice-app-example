@@ -1,54 +1,101 @@
-name: Infraestructura - Deploy con Terraform
+name: Infraestructura - Crear, Aprovisionar y Desplegar
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
     paths:
-      - 'iac/**' # Se activa solo con cambios en la carpeta de infraestructura
+      - 'iac/**'
+      - 'ansible/provision.yml'
       - '.github/workflows/cicd-infrastructure.yml'
-  workflow_dispatch: # Permite ejecutarlo manualmente
+  workflow_dispatch:
 
 jobs:
   terraform-deploy:
     runs-on: ubuntu-latest
+    
     env:
-      # Configura tus credenciales de Azure como secretos en GitHub
-      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      # La contraseña de la VM para Terraform
       TF_VAR_admin_password: ${{ secrets.SSH_PASSWORD }}
+      RESOURCE_GROUP: microservices-rg
 
     steps:
       - name: 1. Checkout del código
         uses: actions/checkout@v4
 
-      - name: 2. Configurar Terraform
+      - name: 2. Iniciar sesión en Azure CLI
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: 3. Limpiar Grupo de Recursos existente con Azure CLI
+        run: az group delete --name ${{ env.RESOURCE_GROUP }} --yes
+        continue-on-error: true
+
+      - name: 4. Configurar Terraform
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.5.0
+          terraform_wrapper: false
 
-      - name: 3. Terraform Init
+      - name: 5. Terraform Init
         run: terraform init
         working-directory: ./iac
 
-      - name: 4. Terraform Apply
-        id: apply # Le damos un ID a este paso para poder usar su output
+      - name: 6. Terraform Apply
         run: terraform apply -auto-approve
         working-directory: ./iac
         
-      - name: 5. Obtener la IP pública de la VM
-        id: get_ip # Le damos un ID a este paso
+      - name: 7. Obtener la IP pública de la VM
+        id: get_ip
         run: |
-          VM_PUBLIC_IP=$(terraform output -raw vm_public_ip)
-          echo "La IP pública de la VM es: $VM_PUBLIC_IP"
-          echo "VM_IP=$VM_PUBLIC_IP" >> $GITHUB_ENV
+          echo "ip=$(terraform output -raw vm_public_ip)" >> $GITHUB_OUTPUT
         working-directory: ./iac
 
-      - name: 6. Actualizar el secreto SSH_HOST en GitHub
+      - name: 8. Actualizar la variable SSH_HOST en GitHub
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # El token por defecto de la Action
+          GH_TOKEN: ${{ secrets.REPO_ACCESS_TOKEN }} 
         run: |
-          gh secret set SSH_HOST --body "${{ env.VM_IP }}"
-          echo "Secreto SSH_HOST actualizado en GitHub con la IP: ${{ env.VM_IP }}"
+          VM_IP="${{ steps.get_ip.outputs.ip }}"
+          echo "La IP pública de la VM es: $VM_IP"
+          gh variable set SSH_HOST --body "$VM_IP"
+          echo "Variable SSH_HOST actualizada en GitHub con la IP: $VM_IP"
+    outputs:
+      vm_ip: ${{ steps.get_ip.outputs.ip }}
+      
+  provision-vm:
+    runs-on: ubuntu-latest
+    needs: terraform-deploy
+    steps:
+      - name: 1. Checkout del código
+        uses: actions/checkout@v4
+
+      - name: 2. Instalar Ansible y dependencias
+        run: |
+          pip install ansible-core docker
+          ansible-galaxy collection install community.docker
+
+      - name: 3. Esperar a que la VM esté lista
+        run: |
+          echo "Esperando a que el puerto 22 esté disponible en ${{ needs.terraform-deploy.outputs.vm_ip }}..."
+          for i in {1..60}; do
+            if nc -zv ${{ needs.terraform-deploy.outputs.vm_ip }} 22 2>/dev/null; then
+              echo "Puerto 22 está listo."
+              break
+            fi
+            echo "Intento $i: Puerto 22 no disponible, reintentando en 10 segundos..."
+            sleep 10
+            if [ $i -eq 60 ]; then
+              echo "Error: El puerto 22 no estuvo disponible a tiempo."
+              exit 1
+            fi
+          done
+          echo "Esperando 30 segundos adicionales para que el sistema termine de inicializar..."
+          sleep 30
+
+      - name: 4. Aprovisionar la VM con Ansible
+        run: |
+          cd ansible
+          ansible-playbook provision.yml \
+            -i "${{ needs.terraform-deploy.outputs.vm_ip }}," \
+            --extra-vars "ansible_user=${{ secrets.SSH_USERNAME }} ansible_ssh_pass=${{ secrets.SSH_PASSWORD }}" \
+            -vv
