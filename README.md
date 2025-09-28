@@ -7,9 +7,13 @@ This repository contains a complete TODO application built on a microservices ar
 * Danna Valentina López Muñoz
 
 **Professor**: DevOps and Cloud Engineer Christian David Flor Astudillo
+
 **Course**: Software Engineering V
+
 **Date**: September 29, 2025
+
 Faculty of Engineering, Design and Applied Sciences
+
 Icesi University. Cali, Valle del Cauca, Colombia
 
 ---
