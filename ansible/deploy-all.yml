@@ -1,0 +1,7 @@
+---
+- name: Desplegar Todos los Microservicios en VM de Azure
+  hosts: all
+  roles:
+    - role: deploy
+      vars:
+        service_name: ""
