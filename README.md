@@ -1,150 +1,122 @@
-# 1. Branching Strategy
+# Polyglot Microservices Application with Automated DevOps Pipelines
 
-Below is a clear branching strategy for both team roles.
+This repository contains a complete TODO application built on a microservices architecture. It showcases a diverse technology stack (Go, Java, Vue, Python, Node.js) and is fully managed by a robust, automated CI/CD pipeline using GitHub Actions, Terraform, and Ansible. The entire infrastructure and application deployment process is automated, from cloud resource provisioning to application updates.
 
-## 1.1 Developers – GitHub Flow (2.5%)
+**DevOps Engineers**:
+* Santiago Valencia García - A00395902
+* Danna Valentina López Muñoz
 
-The development team uses GitHub Flow for small and frequent changes with `main` always deployable.
-
-- `main` is always deployable; small and frequent changes.
-- short-lived branches off `main`: `feature/<topic>`, `fix/<bug>`, `chore/<task>`, `hotfix/<incident>`.
-- open a PR to `main` with mandatory review; CI must be green before merge.
-- merging to `main` triggers CD to the target environment.
-- `hotfix`: prioritized, quick validation, merge to `main` and immediate deploy.
-
-**Guards**: required CI checks, branch protection on `main`, and required approvals.
-
-**Rationale**: simplicity, agility, and short recovery times.
-
-## 1.2 Operations – GitHub Flow (2.5%)
-
-The operations team also uses GitHub Flow for operational changes and continuous delivery.
-
-- `main` is always deployable; small and frequent changes.
-- short-lived branches off `main`: `fix/<topic>`, `chore/<task>`, `hotfix/<incident>`.
-- PR to `main` with review; merging triggers CD to the target environment.
-- `hotfix`: prioritized, quick validation, merge to `main` and immediate deploy.
-
-**Guards**: required CI checks, branch protection on `main`, and required approvals.
-
-**Rationale**: simplicity, agility, and short recovery times aligned with availability goals.
+**Professor**: DevOps and Cloud Engineer Christian David Flor Astudillo
+**Course**: Software Engineering V
+**Date**: September 29, 2025
+Faculty of Engineering, Design and Applied Sciences
+Icesi University. Cali, Valle del Cauca, Colombia
 
 ---
 
-# 2. Infrastructure Deployment Guide
+## Architecture Overview
 
-This section details the process for deploying the application's infrastructure to Azure using Terraform. The architecture consists of a single Virtual Machine that runs the microservices as Docker containers orchestrated by Docker Compose.
+The application is composed of five distinct microservices, a Redis cache, and a Zipkin instance for distributed tracing. The frontend acts as an API Gateway, routing requests to the appropriate backend services.
 
-The deployment strategy is based on the principle of separating the artifact build stage from the deployment stage. Docker images are built and pushed to a container registry first, and the target VM then pulls these pre-built images. This ensures a fast, reliable, and resource-efficient deployment.
+![Application Architecture Diagram](/images/Microservices.png)
 
-## 2.1 Prerequisites
+A detailed breakdown of each service and the implementation of cloud design patterns (Cache-Aside and Circuit Breaker) can be found in the [**Microservices Documentation**](./microservices/README.md).
 
-Ensure the following tools and accounts are available on the local machine before proceeding.
+---
 
-- **Terraform v1.0+**: [Installation Guide](https://learn.hashicorp.com/tutorials/terraform/install-cli)
-- **Azure CLI**: [Installation Guide](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli)
-- **Docker**: [Installation Guide](https://docs.docker.com/get-docker/)
-- An active **Azure Subscription**.
-- A **Docker Hub Account**: [Sign up here](https://hub.docker.com/).
+## Repository Structure
 
-## 2.2 Initial Environment Setup
+This repository is organized into distinct directories, each with a specific responsibility. Each directory contains its own detailed `README.md` file.
 
-These one-time setup steps are required for any user who wishes to deploy the infrastructure.
+* **`./iac/`**: Contains all the Infrastructure as Code written in Terraform. It defines all the necessary Azure cloud resources, such as the virtual machine, virtual network, and security groups.
+    * [**-> Go to IaC Documentation**](./iac/README.md)
+* **`./ansible/`**: Holds the **Ansible** playbooks for **Configuration Management**. These scripts are responsible for bootstrapping the server (installing Docker) and automating application deployments.
+    * [**-> Go to Ansible Documentation**](./ansible/README.md)
+* **`./microservices/`**: The core of the application. It contains the source code for each individual microservice, their Dockerfiles, and the implementation of the cloud design patterns.
+    * [**-> Go to Microservices Documentation**](./microservices/README.md)
+* **`./.github/workflows/`**: Defines all the **CI/CD pipelines** using **GitHub Actions**. This is where the entire automated workflow for infrastructure and application deployment is orchestrated.
+    * [**-> Go to Pipelines Documentation**](./.github/workflows/README.md)
 
-### Step 1: Authenticate with Azure
+---
 
-The user authenticates with Azure through the command-line interface. This command opens a browser window for login.
+## Automated CI/CD Flow
+
+The project is driven by a fully automated CI/CD process that separates infrastructure and application concerns.
+
+1.  **Infrastructure Pipeline**: Triggered by changes in the `iac/` or `ansible/` directories. This GitHub Actions workflow uses Terraform to build (or rebuild) the Azure environment and then runs an Ansible playbook to provision the VM with Docker.
+2.  **Application Pipelines**: Each microservice has its own pipeline that is triggered by code changes in its specific directory. These pipelines build a new Docker image, push it to Docker Hub, and then run an Ansible playbook to deploy the new version to the VM.
+
+This entire flow is designed to be hands-off, enabling continuous delivery from a `git push`.
+
+---
+
+## Branching Strategy: Unified GitHub Flow
+
+To maintain agility and a constantly deployable `main` branch, both the Development and Operations teams use a unified GitHub Flow strategy.
+
+The `main` branch is always considered production-ready and is protected. All work is done on short-lived feature branches that are merged into `main` via Pull Requests (PRs).
+
+#### **Branch Naming Convention**
+
+To clearly distinguish the type of work, branches follow this convention: `<type>/<team>/<description>`
+
+* **`<type>`**: `feature`, `fix`, `chore`, `hotfix`.
+* **`<team>`**: `dev` for application development, `ops` for infrastructure or operations work.
+* **`<description>`-**: A brief, kebab-case description of the task.
+
+**Examples**:
+* `feature/dev/add-user-profile-picture`
+* `fix/ops/update-terraform-vm-size`
+* `chore/dev/refactor-auth-service`
+
+#### **Workflow**
+
+1.  Create a new, descriptive branch from `main`.
+2.  Commit changes to the branch.
+3.  Push the branch and open a Pull Request to `main`.
+4.  The PR must pass all automated CI checks and receive a mandatory code review from another team member.
+5.  Once approved, the PR is merged into `main`, which automatically triggers the corresponding CD pipeline to deploy the changes.
+
+---
+
+## Getting Started: Automated Deployment
+
+There is no manual setup required to deploy the application. The entire process is handled by the GitHub Actions CI/CD pipelines.
+
+### Prerequisites
+
+To enable the automation, the following secrets and variables must be configured in the GitHub repository settings (`Settings > Secrets and variables > Actions`):
+
+* **Secrets**:
+    * `AZURE_CREDENTIALS`: Service principal for authenticating with Azure.
+    * `DOCKERHUB_USERNAME`: Your Docker Hub username.
+    * `DOCKERHUB_TOKEN`: Your Docker Hub access token.
+    * `SSH_PASSWORD`: The password for the admin user on the Azure VM.
+    * `SSH_USERNAME`: The admin username for the Azure VM (e.g., `adminuser`).
+    * `REPO_ACCESS_TOKEN`: A GitHub PAT to allow workflows to update repository variables.
+* **Variables**:
+    * `SSH_HOST`: This variable is created and managed automatically by the infrastructure pipeline. You do not need to set it initially.
+
+### Triggering a Deployment
+
+* **To Deploy Infrastructure**: Make a commit and push to the `main` branch with changes inside the `iac/` directory. This will trigger the `cicd-infrastructure.yml` workflow.
+* **To Deploy a Microservice**: Make a commit and push to the `main` branch with changes inside a specific service's directory (e.g., `microservices/frontend/`). This will trigger that service's specific CI/CD workflow.
+
+### Accessing the Application
+
+Once the infrastructure pipeline has run successfully, the public IP of the virtual machine will be available in the logs of the pipeline run. The application will be accessible at: `http://<VM_PUBLIC_IP>:8080`.
+
+### Cleanup
+
+To destroy all the cloud resources created by the automation, you can run the `terraform destroy` command from the `iac` directory on your local machine after authenticating with Azure CLI.
 
 ```bash
+# Navigate to the iac directory
+cd iac
+
+# Authenticate with Azure
 az login
-```
 
-### Step 2: Configure the Environment
-
-There are two options for deployment depending on the goal. Option A is the fastest and uses pre-built container images. Option B is for developers who wish to modify the microservice source code and deploy their own versions.
-
-#### Option A: Quick Deploy Using Pre-Built Images (Recommended for most users)
-
-This path uses the official, pre-built Docker images for the application. The user does not need to build the images themselves.
-
-1.  **Create the Secrets File**: Terraform requires a password for the VM. Create a file named `terraform.tfvars` inside the `iac/` directory. This file must not be committed to Git. Add the following content, replacing the password value:
-
-    ```terraform
-    admin_password = "YourComplexPassword123!"
-    ```
-
-After this step, proceed directly to the [2.3 Deployment Execution](#23-deployment-execution) section.
-
----
-
-#### Option B: Build and Deploy Custom Images (Developer Workflow)
-
-This path is for users who intend to modify the microservice source code and need to build their own custom Docker images.
-
-1.  **Log in to Docker Hub:**
-    ```bash
-    docker login
-    ```
-
-2.  **Build and Push each microservice:** From the root of the project repository, execute the following commands. Replace `YOUR_DOCKERHUB_USERNAME` with the actual Docker Hub username.
-
-    ```bash
-    # Frontend
-    docker build -t YOUR_DOCKERHUB_USERNAME/frontend ./microservices/frontend
-    docker push YOUR_DOCKERHUB_USERNAME/frontend
-
-    # Auth API
-    docker build -t YOUR_DOCKERHUB_USERNAME/auth-api ./microservices/auth-api
-    docker push YOUR_DOCKERHUB_USERNAME/auth-api
-
-    # ... (Repeat for all other microservices) ...
-    ```
-
-3.  **Update `docker-compose.prod.yml`**: In this file, replace all instances of the original author's Docker Hub username with the user's own username (`YOUR_DOCKERHUB_USERNAME`).
-
-4.  **Publish the Compose File**: Upload the updated `docker-compose.prod.yml` to a public URL, such as a [GitHub Gist](https://gist.github.com/). Click on the "Raw" button to get a direct URL to the file content.
-
-5.  **Update `cloud-init.yml`**: In the `iac/cloud-init.yml` file, replace the placeholder URL in the `curl` command with the raw URL of the user's `docker-compose.prod.yml` file.
-
-6.  **Create the Secrets File**: Create a file named `terraform.tfvars` inside the `iac/` directory with the VM password.
-
-    ```terraform
-    admin_password = "YourComplexPassword123!"
-    ```
-After this step, proceed to the **[2.3 Deployment Execution](#23-deployment-execution)** section.
-
-## 2.3 Deployment Execution
-
-With the setup complete, the infrastructure is deployed using the standard Terraform workflow. Navigate to the iac/ directory to run these commands.
-
-1. **Initialize Terraform:** This command downloads the required providers.
-
-```terraform
-terraform init
-```
-
-2. **Plan the Deployment:** This command shows an execution plan of the resources that will be created.
-
-```terraform
-terraform plan
-```
-
-3. **Apply the Configuration:** This command creates the infrastructure in Azure.
-
-```terraform
-terraform apply
-```
-
-Confirm the action by typing yes when prompted. Then this will show the public IP that the vm took
-
-## 2.4 Verification
-
-**Access the Application:** The frontend is accessible in a web browser at http://<VM_PUBLIC_IP>:8080.
-
-## 2.5 Cleanup
-
-```terraform
+# Destroy all infrastructure
 terraform destroy
 ```
-
-Confirm the action by typing yes when prompted.
