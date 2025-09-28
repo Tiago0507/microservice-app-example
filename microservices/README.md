@@ -72,12 +72,15 @@ The implementation can be seen in the `UsersController.java` file. The `getUser`
 
 The following logs from the `users-api` demonstrate this pattern in action:
 
-![microservice-app-example](/images/cache-aside.jpeg)
+![microservice-app-example](/images/cache-aside1.jpeg)
+![microservice-app-example](/images/cache-aside2.jpeg)
+![microservice-app-example](/images/cache-aside3.jpeg)
 
-* **Log 1 (Cache Miss)**: The first request for user 'johnd' is not in the cache, so the application queries the database.
-* **Logs 2 & 3 (Cache Hit)**: Subsequent requests for 'johnd' are found in Redis and returned instantly.
-* **Log 4 (Invalidating Cache)**: A delete operation is performed on 'johnd', which removes the user from the database and simultaneously evicts the entry from the Redis cache.
-* **Log 5 (Cache Miss)**: The next request for 'johnd' results in a cache miss again, as the entry was invalidated.
+* **(Cache Miss)**: The first request for user 'johnd' is not in the cache, so the application queries the database.
+* **(Cache Hit)**: Subsequent requests for 'johnd' are found in Redis and returned instantly.
+* **(Invalidating Cache)**: A delete operation was executed on key 'johnd', removing the user from the Redis database and simultaneously evicting the corresponding entry from the cache.
+* **(Cache Miss)**: The next request for 'johnd' results in a cache miss again, as the entry was invalidated.
+* **(Cache Hit)**: A subsequent request for 'johnd' is found in Redis again, as the entry has been repopulated after the previous miss.
 
 ### Circuit Breaker Pattern
 
@@ -115,64 +118,98 @@ Any developer can locally verify the functionality of these patterns by followin
 
 ### **Testing the Cache-Aside Pattern**
 
-This test demonstrates the cache hit, cache miss, and cache invalidation flow using two terminals: one for executing commands and one for monitoring logs.
+This test demonstrates the complete Miss → Hit → Invalidate → Miss → Hit cycle. Since the API lacks an `UPDATE` endpoint, we will simulate a cache invalidation by manually deleting the user's key from the Redis cache, which correctly mimics how an update operation would behave.
 
 #### **Prerequisites**
 
-* Ensure all application services are running on the target VM.
-* You will need two terminal windows.
+* Ensure all application services are running on the target VM after a successful pipeline deployment.
+* You will need three separate terminal windows.
 
-#### **Execution Steps**
+#### **Phase 1: Preparation**
 
-1.  **Terminal 1 (Your Local Machine): Prepare for the Test**
-    * Get the public IP of your VM and save it as a variable:
+1.  **Get the VM's Public IP Address**
+    The infrastructure is created by the CI/CD pipeline, not your local machine. Therefore, you must get the IP from GitHub:
+    * Go to your repository's **Actions** tab and find the latest successful run of the **"Infraestructura - Crear, Aprovisionar y Desplegar"** workflow.
+    * Click on the `terraform-deploy` job and check the log for the step named **"Actualizar la variable SSH\_HOST en GitHub"**. The IP will be printed there.
+    * Alternatively, go to **Settings > Secrets and variables > Actions** and find the value of the `SSH_HOST` repository variable.
+
+2.  **Terminal 1 (Your Local Machine): Prepare API Requests**
+    * Save the IP in a variable and obtain a JWT for the user 'johnd'. Replace `<YOUR_VM_PUBLIC_IP>` with the actual IP address.
         ```bash
-        VM_PUBLIC_IP=$(terraform output -raw vm_public_ip)
+        VM_PUBLIC_IP="<YOUR_VM_PUBLIC_IP>"
         echo "La IP pública de la VM es: $VM_PUBLIC_IP"
-        ```
-    * Obtain a JWT for the user 'johnd' to authorize subsequent requests:
-        ```bash
+        
         TOKEN_JOHND=$(curl -s -X POST http://$VM_PUBLIC_IP:8080/api/auth/login -d '{"username": "johnd","password": "foo"}' | sed -E 's/.*"accessToken":"([^"]+)".*/\1/')
+        echo "Token para 'johnd' obtenido."
         ```
 
-2.  **Terminal 2 (SSH into the VM): Monitor the Logs**
-    * Connect to the Azure VM via SSH:
+3.  **Terminal 2 (SSH to VM): Monitor Logs**
+    * Connect to the Azure VM via SSH.
         ```bash
-        ssh adminuser@<VM_PUBLIC_IP>
+        ssh adminuser@$VM_PUBLIC_IP
         ```
-    * Start streaming the logs from the `users-api` container. This window will show you the real-time server reactions.
+    * Start streaming the logs from the `users-api` container. Leave this terminal running to observe the real-time server reactions.
         ```bash
         sudo docker logs -f microservice-app-example-users-api-1
         ```
 
-3.  **Terminal 1: Execute the Test Sequence**
-    * **Step 1: Trigger a Cache Miss**
-        Make the first request to get 'johnd's user data.
+4.  **Terminal 3 (SSH to VM): Redis Interaction**
+    * Open a new terminal window and connect to the same Azure VM.
+        ```bash
+        ssh adminuser@$VM_PUBLIC_IP
+        ```
+    * Keep this terminal ready for the cache invalidation step.
+
+---
+#### **Phase 2: Execution Steps**
+
+Execute the following commands in the specified terminals and observe the log output in Terminal 2.
+
+1.  **Step 1: Trigger a Cache Miss**
+    * In **Terminal 1**, make the first request to get 'johnd's user data.
         ```bash
         curl -H "Authorization: Bearer $TOKEN_JOHND" http://$VM_PUBLIC_IP:8080/api/users/johnd
         ```
-        Observe the `users-api` logs in Terminal 2. You will see a `CACHE MISS` message.
+    * **Observe Terminal 2**: The logs will show a `CACHE MISS` message as the data is fetched from the database and stored in Redis.
 
-    * **Step 2: Trigger a Cache Hit**
-        Immediately run the exact same command again.
+2.  **Step 2: Trigger a Cache Hit**
+    * In **Terminal 1**, immediately run the exact same command again.
         ```bash
         curl -H "Authorization: Bearer $TOKEN_JOHND" http://$VM_PUBLIC_IP:8080/api/users/johnd
         ```
-        This time, the logs in Terminal 2 will show a `CACHE HIT` message.
+    * **Observe in Terminal 2**: This time, the logs will show a `CACHE HIT` message.
 
-    * **Step 3: Invalidate the Cache**
-        Delete the user, which is configured to evict them from the cache.
+3.  **Step 3: Invalidate the Cache Manually**
+    * In **Terminal 3**, connect to the Redis container's command-line interface.
         ```bash
-        curl -X DELETE -H "Authorization: Bearer $TOKEN_JOHND" http://$VM_PUBLIC_IP:8080/api/users/johnd
+        sudo docker exec -it microservice-app-example-redis-1 redis-cli
         ```
-        The logs will show an `INVALIDANDO CACHÉ` message.
+    * Your prompt will change to `127.0.0.1:6379>`. First, find the exact name of the key.
+        ```redis
+        KEYS *
+        ```
+    * The output will list the keys. Find the one corresponding to the user (it may have some binary characters at the start, like `"\xac\xed\x00\x05t\x00\x05johnd"`). Now, delete it using its exact name, including quotes.
+        ```redis
+        DEL "<nombre_exacto_de_la_llave>"
+        ```
+    * Redis should respond with `(integer) 1`, confirming the key was deleted. Now exit the Redis CLI.
+        ```redis
+        exit
+        ```
 
-    * **Step 4: Confirm Cache Invalidation**
-        Request the user one last time.
+4.  **Step 4: Confirm Cache Invalidation (New Cache Miss)**
+    * In **Terminal 1**, request the user one more time.
         ```bash
         curl -H "Authorization: Bearer $TOKEN_JOHND" http://$VM_PUBLIC_IP:8080/api/users/johnd
         ```
-        The logs will once again show a `CACHE MISS`, proving the cache entry was successfully removed.
+    * **Observe in Terminal 2**: The logs will show a `CACHE MISS` again, proving the cache entry was successfully removed and the application had to go back to the database.
+
+5.  **Step 5: Confirm Re-Caching (Final Cache Hit)**
+    * In **Terminal 1**, run the command one last time.
+        ```bash
+        curl -H "Authorization: Bearer $TOKEN_JOHND" http://$VM_PUBLIC_IP:8080/api/users/johnd
+        ```
+    * **Observe in Terminal 2**: You will now see a final `CACHE HIT`, confirming the data was re-cached and the pattern is working correctly.
 
 ### **Testing the Circuit Breaker Pattern**
 
@@ -200,7 +237,9 @@ This test provides a step-by-step script for demonstrating the three states of t
     2.  In your SSH terminal, stop the `users-api` container:
         ```bash
         # Inside the VM
-        sudo docker compose stop users-api
+        cd /home/adminuser/microservice-app-example
+
+        sudo docker compose -f docker-compose.prod.yml stop users-api
         ```
     3.  Back in the browser, attempt to log in with `admin` / `admin` four times in a row.
 * **Observation**:
@@ -226,7 +265,9 @@ This test provides a step-by-step script for demonstrating the three states of t
     1.  In your SSH terminal, restart the `users-api` container:
         ```bash
         # Inside the VM
-        sudo docker compose start users-api
+        cd /home/adminuser/microservice-app-example
+
+        sudo docker compose -f docker-compose.prod.yml start users-api
         ```
     2.  Wait another 10 seconds for the breaker's cooldown period to elapse, allowing it to enter the Half-Open state again.
     3.  In the browser, attempt to log in one last time.

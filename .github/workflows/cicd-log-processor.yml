@@ -13,4 +13,5 @@ jobs:
     uses: ./.github/workflows/reusable-deploy.yml
     with:
       service_name: log-message-processor
+      ssh_host: ${{ vars.SSH_HOST }}
     secrets: inherit

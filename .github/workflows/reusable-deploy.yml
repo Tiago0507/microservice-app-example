@@ -6,6 +6,9 @@ on:
       service_name:
         required: true
         type: string
+      ssh_host:
+        required: true
+        type: string
 
 jobs:
   build-and-push:
@@ -16,19 +19,23 @@ jobs:
       - name: 1. Checkout del código
         uses: actions/checkout@v4
 
-      - name: 2. Iniciar sesión en Docker Hub
+      - name: 2. Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 3. Iniciar sesión en Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: 3. Construir y subir la imagen a Docker Hub
-        id: build_image
+      - name: 4. Construir y subir la imagen a Docker Hub
         uses: docker/build-push-action@v5
         with:
           context: ./microservices/${{ inputs.service_name }}
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.service_name }}:latest
+          cache-from: type=gha,scope=service-${{ inputs.service_name }}
+          cache-to: type=gha,mode=max,scope=service-${{ inputs.service_name }}
 
   deploy-to-vm:
     runs-on: ubuntu-latest
@@ -41,32 +48,20 @@ jobs:
       - name: 1. Checkout del código
         uses: actions/checkout@v4
       
-      - name: 2. Instalar Ansible
-        run: pip install ansible-core docker
+      - name: 2. Instalar Ansible y sus dependencias
+        run: |
+          pip install ansible-core docker
+          ansible-galaxy collection install community.docker
 
-      - name: 3. Instalar Colección de Ansible para Docker
-        run: ansible-galaxy collection install community.docker
-
-      - name: 4. Ejecutar Playbook de Despliegue de Ansible
+      - name: 3. Ejecutar Playbook de Despliegue de Ansible
         run: |
           cd ansible
           ansible-playbook playbook.yml \
-            -i "${{ vars.SSH_HOST }}," \
+            -i "${{ inputs.ssh_host }}," \
             --extra-vars "service_name=${{ env.SERVICE_NAME }}" \
             --extra-vars "project_dir=${{ env.PROJECT_DIR }}" \
             --extra-vars "github_repository=${{ github.repository }}" \
             --extra-vars "dockerhub_username=${{ secrets.DOCKERHUB_USERNAME }}" \
             --extra-vars "ansible_user=${{ secrets.SSH_USERNAME }}" \
             --extra-vars "ansible_ssh_pass=${{ secrets.SSH_PASSWORD }}" \
-            -vv
-
-      - name: 5. Verificar estado del servicio desplegado
-        run: |
-          cd ansible
-          echo "Verificando que el servicio ${{ env.SERVICE_NAME }} esté corriendo..."
-          ansible all \
-            -i "${{ vars.SSH_HOST }}," \
-            --extra-vars "ansible_user=${{ secrets.SSH_USERNAME }} ansible_ssh_pass=${{ secrets.SSH_PASSWORD }}" \
-            -m shell \
-            -a "cd ${{ env.PROJECT_DIR }} && docker compose -f docker-compose.prod.yml ps ${{ env.SERVICE_NAME }}" \
             -vv

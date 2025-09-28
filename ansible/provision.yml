@@ -2,14 +2,10 @@
 - name: Aprovisionar VM con Docker
   hosts: all
   become: yes
-  tasks:
-    - name: 1. Actualizar el caché de paquetes apt
-      ansible.builtin.apt:
-        update_cache: yes
-        cache_valid_time: 3600
-      changed_when: false
+  gather_facts: no
 
-    - name: 2. Instalar paquetes de prerrequisitos
+  tasks:
+    - name: 1. Instalar paquetes de prerrequisitos
       ansible.builtin.apt:
         name:
           - apt-transport-https
@@ -20,31 +16,34 @@
           - git
           - python3-pip
         state: present
+        update_cache: yes
+        cache_valid_time: 3600
 
-    - name: 3. Crear directorio para keyring de Docker
+    - name: 2. Crear directorio para keyring de Docker
       ansible.builtin.file:
         path: /etc/apt/keyrings
         state: directory
         mode: '0755'
 
-    - name: 4. Descargar y añadir la clave GPG oficial de Docker
+    - name: 3. Descargar y añadir la clave GPG oficial de Docker
       ansible.builtin.shell: |
         curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
         chmod a+r /etc/apt/keyrings/docker.gpg
       args:
         creates: /etc/apt/keyrings/docker.gpg
 
-    - name: 5. Añadir el repositorio de Docker
+    - name: Recolectar facts del sistema operativo
+      ansible.builtin.setup:
+        gather_subset:
+          - distribution
+
+    - name: 4. Añadir el repositorio de Docker
       ansible.builtin.apt_repository:
         repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
         state: present
         filename: docker
 
-    - name: 6. Actualizar caché después de añadir repositorio Docker
-      ansible.builtin.apt:
-        update_cache: yes
-
-    - name: 7. Instalar Docker Engine y Docker Compose
+    - name: 5. Instalar Docker Engine y Docker Compose y librerías de Python
       ansible.builtin.apt:
         name:
           - docker-ce
@@ -52,64 +51,51 @@
           - containerd.io
           - docker-compose-plugin
         state: present
+        update_cache: yes
 
-    - name: 8. Instalar la librería Docker de Python con pip
+    - name: 6. Instalar la librería Docker de Python con pip
       ansible.builtin.pip:
         name:
           - docker
           - docker-compose
         executable: pip3
 
-    - name: 9. Asegurar que el servicio de Docker esté iniciado y habilitado
+    - name: 7. Asegurar que el servicio de Docker esté iniciado y habilitado
       ansible.builtin.systemd:
         name: docker
         enabled: yes
         state: started
 
-    - name: 10. Añadir el usuario remoto al grupo de Docker
+    - name: 8. Añadir el usuario remoto al grupo de Docker
       ansible.builtin.user:
         name: "{{ ansible_user }}"
         groups: docker
         append: yes
 
-    - name: 11. Crear enlace simbólico para docker en /usr/bin (compatibilidad)
+    - name: 9. Crear enlace simbólico para docker en /usr/bin (compatibilidad)
       ansible.builtin.file:
         src: /usr/bin/docker
         dest: /usr/local/bin/docker
         state: link
       ignore_errors: yes
 
-    - name: 12. Verificar instalación de Docker
-      ansible.builtin.command: docker --version
-      register: docker_version
-      changed_when: false
-
-    - name: 13. Verificar instalación de Docker Compose
-      ansible.builtin.command: docker compose version
-      register: docker_compose_version
-      changed_when: false
-
-    - name: 14. Mostrar versiones instaladas
-      ansible.builtin.debug:
-        msg: 
-          - "Docker: {{ docker_version.stdout }}"
-          - "Docker Compose: {{ docker_compose_version.stdout }}"
-
-    - name: 15. Reiniciar conexión para aplicar cambios de grupo
+    - name: 10. Reiniciar conexión para aplicar cambios de grupo
       ansible.builtin.meta: reset_connection
-    
-    - name: 16. Verificar instalación de Docker
-      ansible.builtin.command: /usr/bin/docker --version
-      register: docker_version
-      changed_when: false
 
-    - name: 17. Verificar instalación de Docker Compose
-      ansible.builtin.command: /usr/bin/docker compose version
-      register: docker_compose_version
-      changed_when: false
+    - name: 11. Verificar y mostrar versiones instaladas
+      block:
+        - name: Verificar instalación de Docker
+          ansible.builtin.command: docker --version
+          register: docker_version
+          changed_when: false
 
-    - name: 18. Mostrar versiones instaladas
-      ansible.builtin.debug:
-        msg: 
-          - "Docker: {{ docker_version.stdout }}"
-          - "Docker Compose: {{ docker_compose_version.stdout }}"
+        - name: Verificar instalación de Docker Compose
+          ansible.builtin.command: docker compose version
+          register: docker_compose_version
+          changed_when: false
+
+        - name: Mostrar versiones instaladas
+          ansible.builtin.debug:
+            msg: 
+              - "Docker: {{ docker_version.stdout }}"
+              - "Docker Compose: {{ docker_compose_version.stdout }}"
