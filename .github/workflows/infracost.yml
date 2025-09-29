@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'iac/**'
+      - '.github/workflows/infracost.yml'
 
 jobs:
   infracost:
@@ -16,23 +17,38 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: 1. Checkout del código
+      - name: 1. Checkout del código base (main)
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
 
       - name: 2. Configurar Infracost
         uses: infracost/actions/setup@v2
         with:
           api-key: ${{ secrets.INFRACOST_API_KEY }}
 
-      - name: 3. Generar el reporte de diferencia de costos
+      - name: 3. Generar el baseline de costos
+        run: |
+          infracost breakdown --path ./iac \
+            --format=json \
+            --out-file=/tmp/infracost-base.json \
+            --terraform-var="admin_password=${{ secrets.SSH_PASSWORD }}"
+
+      - name: 4. Checkout del código del PR
+        uses: actions/checkout@v4
+
+      - name: 5. Generar el reporte de diferencia de costos
         run: |
           infracost diff --path ./iac \
+            --compare-to /tmp/infracost-base.json \
             --format=json \
             --out-file=/tmp/infracost.json \
             --terraform-var="admin_password=${{ secrets.SSH_PASSWORD }}"
 
-      - name: 4. Publicar comentario en el Pull Request
+      - name: 6. Publicar comentario en el Pull Request
         run: |
-          infracost comment github --path "/tmp/infracost.json" --behavior update
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          infracost comment github --repo ${{ github.repository }} \
+                                   --pull-request ${{ github.event.pull_request.number }} \
+                                   --path "/tmp/infracost.json" \
+                                   --behavior update \
+                                   --github-token ${{ secrets.GITHUB_TOKEN }}

@@ -10,6 +10,8 @@ The CI/CD strategy is built upon a clear separation of concerns:
 
 2.  **Application Pipelines (`reusable-deploy.yml`)**: These workflows manage the lifecycle of the individual microservices. They are designed to be highly modular. A central, reusable workflow handles the logic of building a Docker image, pushing it to a registry, and deploying it. Each microservice then has a simple "trigger" workflow (e.g., `cicd-frontend.yml`) that calls the reusable one when its specific source code changes.
 
+3.  **Cost Estimation Pipeline (`infracost.yml`)**: This workflow acts as a FinOps guardrail, providing visibility into the financial impact of infrastructure changes *before* they are applied. It is triggered by Pull Requests that modify infrastructure code.
+
 This separation ensures that infrastructure changes are handled safely and independently from application updates, which can happen much more frequently.
 
 ---
@@ -18,14 +20,18 @@ This separation ensures that infrastructure changes are handled safely and indep
 
 The entire process is orchestrated to connect infrastructure provisioning with application deployment seamlessly.
 
-1.  **Infrastructure Provisioning**: An operator pushes a change to the `iac/` directory.
+1.  **Cost Estimation (Pull Request)**: An operator opens a Pull Request with changes to the `iac/` directory.
+    * The `infracost.yml` workflow is triggered.
+    * It calculates the cost of the infrastructure on the `main` branch (baseline).
+    * It then calculates the cost of the proposed changes in the Pull Request.
+    * Finally, it posts a comment in the PR summarizing the cost difference, enabling an informed approval decision.
+2.  **Infrastructure Provisioning**: An operator pushes a change to the `iac/` directory.
     * The `cicd-infrastructure.yml` workflow is triggered.
     * A `terraform-deploy` job creates a new Azure VM and updates a GitHub variable (`SSH_HOST`) with the new IP.
     * A `provision-vm` job connects to this VM and installs Docker using Ansible.
     * A `build-all-services` job builds and pushes fresh Docker images for all microservices in parallel.
     * Finally, a `deploy-all-services` job runs the `deploy-all.yml` Ansible playbook to launch the entire application stack on the newly provisioned server.
-
-2.  **Application Deployment**: A developer pushes a code change to the `auth-api` microservice.
+3.  **Application Deployment**: A developer pushes a code change to the `auth-api` microservice.
     * The `cicd-auth-api.yml` workflow is triggered.
     * This workflow calls the `reusable-deploy.yml` workflow, passing `service_name: auth-api` as a parameter.
     * The `reusable-deploy.yml` workflow takes over:
@@ -72,6 +78,20 @@ These files are very simple triggers that call the reusable workflow.
 * **Triggers**: On `push` to `main` when code changes within that microservice's specific directory.
 * **Job**: A single job that calls `reusable-deploy.yml`, passing the correct `service_name` and inheriting secrets.
 
+### 4. `infracost.yml`
+
+This workflow integrates FinOps into the CI/CD cycle by providing automated cost estimates for infrastructure changes.
+
+* **Triggers**: On `pull_request` to `main` with changes in the `iac/**` directory.
+
+* **Jobs**:
+    * **`infracost`**: This job performs a cost analysis by comparing the proposed changes in the PR against the current state of the `main` branch.
+        1.  Checks out the code from the base branch (`main`) to establish a cost baseline.
+        2.  Runs `infracost breakdown` to generate a JSON file representing the current costs.
+        3.  Checks out the code from the PR branch.
+        4.  Runs `infracost diff` comparing the PR's code against the baseline JSON file.
+        5.  Posts a comment directly on the Pull Request with a clear summary of the cost changes, including any new costs, increases, or decreases.
+
 ---
 
 ## Configuration: Secrets and Variables
@@ -85,5 +105,6 @@ The pipelines rely on the following GitHub repository secrets and variables:
     * `SSH_USERNAME`: Admin username for the Azure VM.
     * `SSH_PASSWORD`: Admin password for the Azure VM.
     * `REPO_ACCESS_TOKEN`: A GitHub Personal Access Token (PAT) used to update repository variables.
+    * `INFRACOST_API_KEY`: The API key for authenticating with Infracost Cloud.
 * **Variables**:
     * `SSH_HOST`: The public IP of the Azure VM. This is managed automatically by the infrastructure pipeline.
