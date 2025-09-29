@@ -4,7 +4,7 @@ This repository contains a complete TODO application built on a microservices ar
 
 **DevOps Engineers**:
 * Santiago Valencia García - A00395902
-* Danna Valentina López Muñoz
+* Danna Valentina López Muñoz - A00395625
 
 **Professor**: DevOps and Cloud Engineer Christian David Flor Astudillo
 
