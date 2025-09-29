@@ -106,7 +106,7 @@ resource "azurerm_linux_virtual_machine" "vm" {
   name                = "microservices-vm"
   resource_group_name = var.resource_group_name
   location            = var.location
-  size                = "Standard_B4ms"
+  size                = "Standard_B2s"
   admin_username      = var.admin_username
   admin_password      = var.admin_password
   disable_password_authentication = false
