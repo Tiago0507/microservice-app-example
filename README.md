@@ -22,7 +22,7 @@ Icesi University. Cali, Valle del Cauca, Colombia
 
 The application is composed of five distinct microservices, a Redis cache, and a Zipkin instance for distributed tracing. The frontend acts as an API Gateway, routing requests to the appropriate backend services.
 
-![Application Architecture Diagram](/images/Microservices.png)
+![Application Architecture Diagram](/images/architecture-diagram.png)
 
 A detailed breakdown of each service and the implementation of cloud design patterns (Cache-Aside and Circuit Breaker) can be found in the [**Microservices Documentation**](./microservices/README.md).
 
