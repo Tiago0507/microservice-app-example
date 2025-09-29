@@ -47,6 +47,8 @@ jobs:
 
       - name: 6. Publicar comentario en el Pull Request
         run: |
-          infracost comment github --path "/tmp/infracost.json" --behavior update
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          infracost comment github --repo ${{ github.repository }} \
+                                   --pull-request ${{ github.event.pull_request.number }} \
+                                   --path "/tmp/infracost.json" \
+                                   --behavior update \
+                                   --github-token ${{ secrets.GITHUB_TOKEN }}
