@@ -3,8 +3,11 @@
 This repository contains a complete TODO application built on a microservices architecture. It showcases a diverse technology stack (Go, Java, Vue, Python, Node.js) and is fully managed by a robust, automated CI/CD pipeline using GitHub Actions, Terraform, and Ansible. The entire infrastructure and application deployment process is automated, from cloud resource provisioning to application updates.
 
 **DevOps Engineers**:
-* Santiago Valencia García - A00395902
-* Danna Valentina López Muñoz - A00395625
+
+- Santiago Valencia García - A00395902
+- Danna Valentina López Muñoz - A00395625
+
+**Original Project Authors**: @bortizf, based on @elgris' foundational work
 
 **Professor**: DevOps and Cloud Engineer Christian David Flor Astudillo
 
@@ -32,14 +35,14 @@ A detailed breakdown of each service and the implementation of cloud design patt
 
 This repository is organized into distinct directories, each with a specific responsibility. Each directory contains its own detailed `README.md` file.
 
-* **`./iac/`**: Contains all the Infrastructure as Code written in Terraform. It defines all the necessary Azure cloud resources, such as the virtual machine, virtual network, and security groups.
-    * [**-> Go to IaC Documentation**](./iac/README.md)
-* **`./ansible/`**: Holds the **Ansible** playbooks for **Configuration Management**. These scripts are responsible for bootstrapping the server (installing Docker) and automating application deployments.
-    * [**-> Go to Ansible Documentation**](./ansible/README.md)
-* **`./microservices/`**: The core of the application. It contains the source code for each individual microservice, their Dockerfiles, and the implementation of the cloud design patterns.
-    * [**-> Go to Microservices Documentation**](./microservices/README.md)
-* **`./.github/workflows/`**: Defines all the **CI/CD pipelines** using **GitHub Actions**. This is where the entire automated workflow for infrastructure and application deployment is orchestrated.
-    * [**-> Go to Pipelines Documentation**](./.github/workflows/README.md)
+- **`./iac/`**: Contains all the Infrastructure as Code written in Terraform. It defines all the necessary Azure cloud resources, such as the virtual machine, virtual network, and security groups.
+  - [**-> Go to IaC Documentation**](./iac/README.md)
+- **`./ansible/`**: Holds the **Ansible** playbooks for **Configuration Management**. These scripts are responsible for bootstrapping the server (installing Docker) and automating application deployments.
+  - [**-> Go to Ansible Documentation**](./ansible/README.md)
+- **`./microservices/`**: The core of the application. It contains the source code for each individual microservice, their Dockerfiles, and the implementation of the cloud design patterns.
+  - [**-> Go to Microservices Documentation**](./microservices/README.md)
+- **`./.github/workflows/`**: Defines all the **CI/CD pipelines** using **GitHub Actions**. This is where the entire automated workflow for infrastructure and application deployment is orchestrated.
+  - [**-> Go to Pipelines Documentation**](./.github/workflows/README.md)
 
 ---
 
@@ -64,14 +67,15 @@ The `main` branch is always considered production-ready and is protected. All wo
 
 To clearly distinguish the type of work, branches follow this convention: `<type>/<team>/<description>`
 
-* **`<type>`**: `feature`, `fix`, `chore`, `hotfix`.
-* **`<team>`**: `dev` for application development, `ops` for infrastructure or operations work.
-* **`<description>`-**: A brief, kebab-case description of the task.
+- **`<type>`**: `feature`, `fix`, `chore`, `hotfix`.
+- **`<team>`**: `dev` for application development, `ops` for infrastructure or operations work.
+- **`<description>`-**: A brief, kebab-case description of the task.
 
 **Examples**:
-* `feature/dev/add-user-profile-picture`
-* `fix/ops/update-terraform-vm-size`
-* `chore/dev/refactor-auth-service`
+
+- `feature/dev/add-user-profile-picture`
+- `fix/ops/update-terraform-vm-size`
+- `chore/dev/refactor-auth-service`
 
 #### **Workflow**
 
@@ -91,20 +95,20 @@ There is no manual setup required to deploy the application. The entire process 
 
 To enable the automation, the following secrets and variables must be configured in the GitHub repository settings (`Settings > Secrets and variables > Actions`):
 
-* **Secrets**:
-    * `AZURE_CREDENTIALS`: Service principal for authenticating with Azure.
-    * `DOCKERHUB_USERNAME`: Your Docker Hub username.
-    * `DOCKERHUB_TOKEN`: Your Docker Hub access token.
-    * `SSH_PASSWORD`: The password for the admin user on the Azure VM.
-    * `SSH_USERNAME`: The admin username for the Azure VM (e.g., `adminuser`).
-    * `REPO_ACCESS_TOKEN`: A GitHub PAT to allow workflows to update repository variables.
-* **Variables**:
-    * `SSH_HOST`: This variable is created and managed automatically by the infrastructure pipeline. You do not need to set it initially.
+- **Secrets**:
+  - `AZURE_CREDENTIALS`: Service principal for authenticating with Azure.
+  - `DOCKERHUB_USERNAME`: Your Docker Hub username.
+  - `DOCKERHUB_TOKEN`: Your Docker Hub access token.
+  - `SSH_PASSWORD`: The password for the admin user on the Azure VM.
+  - `SSH_USERNAME`: The admin username for the Azure VM (e.g., `adminuser`).
+  - `REPO_ACCESS_TOKEN`: A GitHub PAT to allow workflows to update repository variables.
+- **Variables**:
+  - `SSH_HOST`: This variable is created and managed automatically by the infrastructure pipeline. You do not need to set it initially.
 
 ### Triggering a Deployment
 
-* **To Deploy Infrastructure**: Make a commit and push to the `main` branch with changes inside the `iac/` directory. This will trigger the `cicd-infrastructure.yml` workflow.
-* **To Deploy a Microservice**: Make a commit and push to the `main` branch with changes inside a specific service's directory (e.g., `microservices/frontend/`). This will trigger that service's specific CI/CD workflow.
+- **To Deploy Infrastructure**: Make a commit and push to the `main` branch with changes inside the `iac/` directory. This will trigger the `cicd-infrastructure.yml` workflow.
+- **To Deploy a Microservice**: Make a commit and push to the `main` branch with changes inside a specific service's directory (e.g., `microservices/frontend/`). This will trigger that service's specific CI/CD workflow.
 
 ### Accessing the Application
 
@@ -124,3 +128,69 @@ az login
 # Destroy all infrastructure
 terraform destroy
 ```
+
+---
+
+## Live Deployment: From Infrastructure to Production
+
+The following documentation captures the complete deployment workflow, demonstrating the end-to-end automation from infrastructure provisioning through application delivery and continuous updates.
+
+### Infrastructure Pipeline Execution
+
+The infrastructure pipeline orchestrates the provisioning of all Azure resources and the provisioning of the virtual machine with Docker. This workflow triggers automatically when changes are pushed to the `iac/` directory.
+
+![Infrastructure Pipeline Success](images/screenshots/github-actions-infrastructure-pipeline.png)
+
+The pipeline executes three parallel jobs: infrastructure deployment via Terraform, VM provisioning through Ansible, and simultaneous building and pushing of all microservice images to Docker Hub.
+
+### Azure Resources Deployment
+
+Once the infrastructure pipeline completes, all necessary Azure resources are instantiated and configured. The resource group contains the virtual machine, virtual network, network security groups, and public IP address required to host and access the application.
+
+![Azure Portal Resource Group](images/screenshots/azure-portal-deployed-resources.png)
+
+The provisioning process configures a Standard_B2s Ubuntu 22.04 LTS virtual machine with Docker and Docker Compose pre-installed, ready to host the containerized microservices.
+
+### Application Accessibility
+
+Upon successful infrastructure deployment, the application becomes immediately accessible through the public IP address assigned to the virtual machine. The frontend service acts as the primary entry point, providing the user interface for interacting with the TODO application.
+
+![Application Login Interface](images/screenshots/app-login-interface.png)
+
+The frontend is deployed on port 8080, serving as a reverse proxy that routes API requests to the respective backend microservices. Authentication is required to access the application, leveraging the Auth API service built with Go.
+
+### Continuous Delivery: Code Changes to Production
+
+The repository implements a fully automated continuous delivery workflow. When developers commit changes to a microservice directory, GitHub Actions automatically builds the Docker image, pushes it to Docker Hub, and deploys the updated service to the running application.
+
+#### Source Code Modification
+
+Developers make code changes in their feature branches. In this example, a modification to the Login component was committed to enhance the user interface with a welcome label.
+
+![Code Modification in VSCode](images/screenshots/code-change-login-vue.png)
+
+The change was made to the Vue.js Login component, demonstrating how frontend modifications flow through the pipeline.
+
+#### Automated Pipeline Execution
+
+Upon pushing the changes to the main branch, the frontend-specific CI/CD pipeline triggers automatically, executing the build, push, and deployment stages.
+
+![Frontend Pipeline Success](images/screenshots/github-actions-frontend-pipeline.png)
+
+The pipeline completes in under three minutes, demonstrating the efficiency of containerized deployment. The new image is built, pushed to Docker Hub, and deployed to the running instance without any manual intervention.
+
+#### Live Application Update
+
+The updated application reflects the changes immediately after the pipeline completes. The new UI element is visible in the login interface, confirming that the continuous delivery pipeline successfully delivered the code change from git commit to production.
+
+![Updated Login Interface](images/screenshots/app-updated-login-screen.png)
+
+The entire flow from code change to production deployment occurs automatically, reducing deployment risk and enabling rapid iteration.
+
+### Container Image Registry
+
+All microservice images are published to Docker Hub, serving as the container registry for the deployment pipeline. The images are tagged with the `latest` tag, ensuring that the deployment playbooks always pull the most recent version.
+
+![Docker Hub Published Images](images/screenshots/dockerhub-published-images.png)
+
+The registry maintains images for all five microservices: frontend, auth-api, users-api, todos-api, and log-message-processor. Each image is built using optimized multi-stage Dockerfiles to minimize size and maximize security.
