@@ -27,22 +27,22 @@ The application is composed of five distinct microservices, a Redis cache, and a
 
 ![Application Architecture Diagram](/images/architecture-diagram.png)
 
-A detailed breakdown of each service and the implementation of cloud design patterns (Cache-Aside and Circuit Breaker) can be found in the [**Microservices Documentation**](./microservices/README.md).
+A detailed breakdown of each service and the implementation of cloud design patterns (Cache-Aside and Circuit Breaker) can be found in the [**Microservices Documentation**](./microservices/ARCHITECTURE.md).
 
 ---
 
 ## Repository Structure
 
-This repository is organized into distinct directories, each with a specific responsibility. Each directory contains its own detailed `README.md` file.
+This repository is organized into distinct directories, each with a specific responsibility. Each directory contains its own detailed documentation file.
 
 - **`./iac/`**: Contains all the Infrastructure as Code written in Terraform. It defines all the necessary Azure cloud resources, such as the virtual machine, virtual network, and security groups.
-  - [**-> Go to IaC Documentation**](./iac/README.md)
+  - [**Infrastructure Documentation**](./iac/INFRASTRUCTURE.md)
 - **`./ansible/`**: Holds the **Ansible** playbooks for **Configuration Management**. These scripts are responsible for bootstrapping the server (installing Docker) and automating application deployments.
-  - [**-> Go to Ansible Documentation**](./ansible/README.md)
+  - [**Configuration Management Documentation**](./ansible/CONFIGURATION.md)
 - **`./microservices/`**: The core of the application. It contains the source code for each individual microservice, their Dockerfiles, and the implementation of the cloud design patterns.
-  - [**-> Go to Microservices Documentation**](./microservices/README.md)
+  - [**Microservices Architecture Documentation**](./microservices/ARCHITECTURE.md)
 - **`./.github/workflows/`**: Defines all the **CI/CD pipelines** using **GitHub Actions**. This is where the entire automated workflow for infrastructure and application deployment is orchestrated.
-  - [**-> Go to Pipelines Documentation**](./.github/workflows/README.md)
+  - [**CI/CD Workflows Documentation**](./.github/WORKFLOWS.md)
 
 ---
 
