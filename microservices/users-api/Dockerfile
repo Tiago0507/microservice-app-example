@@ -3,10 +3,10 @@
 # This file employs a multi-stage build process to compile the Java application
 # and create a minimal, optimized production image.
 
-# --- Stage 1: Build Environment ---
+# Stage 1: Build Environment
 # Defines the 'build' stage using a Maven image that includes a full JDK.
 # This stage contains all necessary tools to compile and package the application.
-FROM maven:3.5-jdk-8 as build
+FROM maven:3.8-eclipse-temurin-8 AS build
 
 # Sets the working directory inside the build container.
 WORKDIR /app
@@ -26,10 +26,10 @@ COPY src ./src
 # The '-DskipTests' flag is used to speed up the build process by skipping tests.
 RUN mvn package -DskipTests
 
-# --- Stage 2: Runtime Environment ---
-# Defines the final production stage using a slim OpenJDK image. This image
+# Stage 2: Runtime Environment
+# Defines the final production stage using a slim Eclipse Temurin (OpenJDK) image. This image
 # contains only the Java Runtime Environment (JRE), making it smaller and more secure.
-FROM openjdk:8-jre-slim
+FROM eclipse-temurin:8-jre
 
 # Updates the package list and installs 'netcat-openbsd'. This lightweight utility
 # is used by the healthcheck command in docker-compose.yml to verify that the
